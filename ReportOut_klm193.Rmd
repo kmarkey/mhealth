@@ -1,0 +1,1792 @@
+---
+title: "Evaluation of Mental Health in 2020 Final Report"
+subtitle: "Spring 2022" 
+author: "Keaton Markey"
+date:  "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  bookdown::html_document2:
+    toc: true
+    toc_depth: 4
+    fig_caption: true
+fontsize: 12pt
+number_sections: false
+geometry: "left=1cm,right=1cm,top=1.5cm,bottom=1.5cm"
+always_allow_html: yes
+header-includes:
+- \usepackage[section]{placeins}
+- \usepackage{fixltx2e}
+- \usepackage{longtable}
+- \usepackage{pdflscape}
+- \usepackage{graphicx}
+- \usepackage{caption}
+- \usepackage{gensymb}
+- \usepackage{subcaption}
+- \DeclareUnicodeCharacter{2264}{$\pm$}
+- \DeclareUnicodeCharacter{2265}{$\geq$}
+- \usepackage{fancyhdr}
+- \usepackage{lipsum}
+---
+
+```{r setup, include = FALSE}
+
+#Please modify the chunk set up as you wish, some options are in # below
+knitr::opts_chunk$set(fig.align = "center", 
+                      out.width = "90%", 
+                      out.height = "70%", 
+                      dpi = 600, 
+                      dev = 'png')
+#Add packages
+
+library(tidyverse)
+library(cowplot)
+library(ggridges)
+library(kableExtra)
+library(usmap)
+library(corrplot)
+library(readxl)
+library(scales)
+library(gridExtra)
+library(ggrepel)
+```
+
+# Theme
+
+```{r theme}
+#Set universal theme + palette for figures
+
+pal <- c("#f6aa1c","#08415c","#6b818c","#eee5e9","#ba7ba1","#c28cae","#a52a2a")
+
+blue <- "#114482"
+lightblue <- "#146ff8"
+llightblue <- "#AFCFFF"
+red <- "#a52a2a"
+white <- "#FBFFF1"
+yellow <- "#F6AA1C"
+
+ljtheme <- function(){
+    theme_minimal() %+replace%
+    theme(
+      panel.grid.major = element_line(linetype = "solid", color = llightblue, size = 0.1),
+      panel.grid.minor = element_blank(),
+      panel.background = element_rect(fill = white), #light
+      panel.border = element_rect(color = lightblue, fill = NA, linetype = "solid", size = 2),
+      legend.background = element_rect(fill = white, color = lightblue, size = 1), # legend
+      legend.text = element_text(color = blue),
+      legend.title = element_text(face = "bold.italic", color = blue),
+      legend.position = "bottom",
+      legend.key = element_rect(fill = white),
+      text = element_text(color = white),
+      axis.title = element_text(face = "italic", size = 11, color = white), 
+      axis.text = element_text(color = white, size = 9), 
+      axis.ticks = element_line(color = white, size = .5, lineend = "butt"), 
+      axis.ticks.length = unit(.1, "cm"),
+      plot.title = element_text(face = "bold", # labels
+                              color = white, size = 14, hjust = 0, vjust = 1.5),
+      plot.subtitle = element_text(color = white, hjust = 0, vjust = 1.5, face = "italic"),
+      plot.caption = element_text(color = white, face = "bold", hjust = 1),
+      plot.background = element_rect(fill = blue),
+      strip.background = element_blank(),
+      strip.text = element_text())}
+
+theme_set(ljtheme())
+```
+
+# Introduction 6
+
+In the past year, during a period of isolation and suffering, global mental health is at a low point. For many, mental health is a difficult subject. It's not taught well in schools, it's not talked about, and there is a stigma around seeking help. Especially after the onset of COVID-19, global health became a top priority for health organizations like the WHO, CDC, and governments around the world. But even before the onset of the pandemic, mental health was a concern nationwide
+
+In the United States, 40% of U.S. adults reported struggling with mental health or substance use. Suicide is the second-leading cause of death among people aged 10-34. Further, diagnosing mental health issues is a problem as well. The average delay between onset of mental illness symptoms and treatment is 11 years. 
+
+The goal of this project is to assess the availability of mental health services and the state of mental health nationwide. The first step in solving this mental crisis is recognizing what may be contributing to the problem. Discussing some of the causes of mental health disorders is beyond the scope of this project, but its important to ensure that help is available to those who need it. Each year, the CDC conducts a survey using the Behavioral Risk Factor Surveillance System. Surveyors contacted 400,000 people in 2020 by land-line or cell phone and asked questions about their general health. Another yearly survey, the National Mental Health Services Survey collects information from mental health facilities. While these surveys are not directly associated, this project studies them independently and together to assess th situation of the available infrastructure, reporting methods, and state-specific outcomes regarding mental health in the United States.
+
+If lawmakers and officials are sensitive to the needs of their constituents, we should see some relationships between the mental health need and the kind of treatment available in each state.
+
+# Data Science Methods 6
+
+Methods that were used in this project include use of dplyr to clean and tidy data. After cleaning I performed exploratory analysis using ggplot2 and other visualization packages. Finally, I used base R packages to construct simple models to describe the relationship between facility density, facility type, and population need.
+
+# Exploratory Analysis 6
+
+After a few weeks of conducting EDA, here are the highlights that I would like to share in this report.   
+
+## Summary 6
+
+The analysis began by exploring both datasets independently to select for important variables and factors that may relate to mental health. Both datasets contained coded variables so much of my time consisted of decoding them and getting an idea of what kind of information was contained in both the behavioral survey and the facilities survey. From there, I initially intended to split each up by state, age, race, and sex. However, the complexity of the data and the nature of some of the variables made this task too difficult to accomplish in the allotted time. I was only able to retrieve summarized data based on state, but this was still very helpful for answering some of my questions.
+
+## Data Cleaning 6
+
+After filtering down to selected variables, I decided to decode them to make EDA easier. This took more time up-front as opposed to doing it on the fly, but I think it made my data easier to understand and interpret in the long run. There were a combination of categorical and continuous variables in both datasets, but the overwhelming amount were categorical. Only a few, like _BMI_ from **BRFSS** and some calculated counts variables from **N-MHSS** ended up as continuous. Additionally, in **N-MHSS**, there were variables that contained ranges. These ranged were variable in size and in prevalence. To handle these numerically and get state-specific summaries, I used only the lower bound to get a conservative estimate. These numbers were from patient data from facilities during the beginning of quarantine measures, so while I select the lower bound, its not unreasonable to assume that some facilities may have experienced an increase in patients during this period compared to normal levels.
+
+I also found it pretty easy to compile lists of vars that I want to use and then pass the list to selector functions like __all_of()__.
+
+For **N-MHSS**, many of the coded variables represented the same values so I thought it would be beneficial to decode them in one step using a function of my own design, _basiclayer_.
+
+This was performed in an Rscript.
+
+
+```{r digest}
+require(foreign)
+require(readr)
+require(dplyr)
+require(stringr)
+
+# setwd("LocalRStudio/mhealth352")
+
+#################### states
+
+statekey <- tibble(name = str_to_lower(state.name), abb = state.abb, num = c(1:8, 10:51)) %>%
+  rows_insert(tibble(name = "district of columbia", abb = "DC", num = 9)) %>%
+  arrange(name)
+
+#################### functions
+`%!in%` <- Negate(`%in%`)
+
+# 0 = no
+# 1 = yes
+# -1 = missing
+# -2 = logical skip
+basiclayer <- function(x, ...) {
+  if (all(levels(as.factor(x)) == c("-2", "-1", "0", "1"))) { # 4
+    factor(x, labels = c("-2" = "logical skip", "-1" = NA, "0" = "no", "1" = "yes"), ordered = TRUE) 
+  } else if (all(levels(as.factor(x)) == c("-1", "0", "1"))) { # 3
+    factor(x, labels = c("-1" = NA, "0" = "no", "1" = "yes"), ordered = TRUE)
+  } else if (all(levels(as.factor(x)) == c("0", "1"))) { # 2
+    factor(x, labels = c("0" = "no", "1" = "yes"), ordered = TRUE)
+  } else if (all(levels(as.factor(x)) == c("-2", "0", "1"))) { # 3 without missing
+    factor(x, labels = c("-2" = "logical skip", "0" = "no", "1" = "yes"), ordered = TRUE)
+  } else if (all(levels(as.factor(x)) == c("-2", "0", "1", "2", "3", "4", "5", "6", 
+                                           "7", "8", "9", "10", "11", "12"))) { # 14 level to 12
+    factor(x, labels = c("-2" = "logical skip", "0" = "0", "1" = "1-10", "2" = "11-20", 
+                         "3" = "21-30", "4" = "31-40", "5" = "41-50", "6" = "51-75", 
+                         "7" = "76-100", "8" = "101-250", "9" = "251-500", 
+                         "10" = "501-1000", "11" = "1001-1500", "12" = "1500+"), ordered = TRUE)
+  } else if (all(levels(as.factor(x)) == c("-2","-1", "0", "1", "2", "3", "4", "5", "6", 
+                                           "7", "8", "9", "10", "11", "12"))) { # 15 level
+    factor(x, labels = c("-2" = "logical skip", "-1" = NA, "0" = "0", "1" = "1-10", 
+                         "2" = "11-20", "3" = "21-30", "4" = "31-40", "5" = "41-50", 
+                         "6" = "51-75", "7" = "76-100", "8" = "101-250", "9" = "251-500", 
+                         "10" = "501-1000", "11" = "1001-1500", "12" = "1500+"), ordered = TRUE)
+  } else if (all(levels(as.factor(x)) == c("-2","-1", "0", "1", "2", "3", "4", "5", "6", 
+                                           "7", "8", "9", "10", "11"))) { # 14 level to  11
+    factor(x, labels = c("-2" = "logical skip", "-1" = NA, "0" = "0", "1" = "1-10", 
+                         "2" = "11-20", "3" = "21-30", "4" = "31-40", "5" = "41-50", 
+                         "6" = "51-75", "7" = "76-100", "8" = "101-250", "9" = "251-500", 
+                         "10" = "501-1000", "11" = "1001-1500"), ordered = TRUE)
+  } else if (all(levels(as.factor(x)) == c("-2","-1", "0", "1", "2", "3", "4", "5", "6", 
+                                           "7", "8", "9", "10"))) { # 13 level
+    factor(x, labels = c("-2" = "logical skip", "-1" = NA, "0" = "0", "1" = "1-10", 
+                         "2" = "11-20", "3" = "21-30", "4" = "31-40", "5" = "41-50", 
+                         "6" = "51-75", "7" = "76-100", "8" = "101-250", "9" = "251-500", 
+                         "10" = "501-1000"), ordered = TRUE)
+  } else if (all(levels(as.factor(x)) == c("-2","-1", "0", "1", "2", "3", "4", "5", "6", 
+                                           "7"))) { # pct levels
+    factor(x, labels = c("-2" = "logical skip", "-1" = NA, "0" = "0", "1" = "1-10", 
+                         "2" = "11-20", "3" = "21-30", "4" = "31-40", "5" = "41-50", 
+                         "6" = "51-75", "7" = "76-100"), ordered = TRUE)
+  }
+  else {
+    cat("Function not applicable for column", deparse(substitute(x)), "\n")
+    return(x)
+  }
+}
+
+################################################################################
+#### cdc first
+# data dictionary
+# https://www.cdc.gov/brfss/annual_data/2020/pdf/codebook20_llcp-v2-508.pdf
+cdc <- read.xport("data/LLCP2020.XPT")
+
+### TODO,
+# filter out redundant vars
+# remove bad vars
+# decode some vars
+# report decisions
+
+#important vars
+idvar <- c("X_STATE", "IDATE", "QSTLANG", "X_METSTAT",
+           "X_URBSTAT", "X_IMPRACE", "X_RFHLTH",
+           "X_PHYS14D", "X_MENT14D", "X_SEX", "X_AGE_G",
+           "HTM4", "WTKG3", "X_BMI5", "X_EDUCAG", "X_INCOMG")
+cdchealthvars <- c("GENHLTH", "PHYSHLTH", "MENTHLTH", "POORHLTH", "EMPLOY1", "EXERANY2")
+
+othervars <- c("HLTHPLN1", 'PERSDOC2', "MEDCOST", "CHECKUP1", "MARITAL", "CHILDREN", "MENTHLTH",
+               "PHYSHLTH", "GENHLTH")
+
+# not included
+calc <- c("IDATE", "QSTLANG", "X_SEX", "X_EDUCAG", "X_URBSTAT", "X_METSTAT", "X_IMPRACE",
+          "X_RFHLTH", "X_PHYS14D", "X_MENT14D", "EXERANY2", "GENHLTH", "X_AGE_G", "X_INCOMG", "EMPLOY1")
+
+brfss <- cdc %>%
+  dplyr::filter(IYEAR == 2020, X_STATE %!in% c("66", "72")) %>%
+  dplyr::select(all_of(idvar), all_of(cdchealthvars), all_of(othervars)) %>%
+  dplyr::mutate(date = as.Date(IDATE, format = "%m%d%Y"),
+         qstlang = factor(QSTLANG, labels = c("1" = "english", "2" = "spanish", "3" = "other")),
+         sex = factor(X_SEX, labels = c("1" = "male", "2" = "female")),
+         edu = factor(X_EDUCAG, labels = c("1" = "Did not graduate High School",
+                                            "2" = "Graduated High School",
+                                            "3" = "Attended College or Technical School",
+                                            "4" = "Graduated from College or Technical School",
+                                            "9" = NA)),
+         metro = factor(X_METSTAT, labels = c("1" = "metropolitan", "2" = "non-metropolitan")),
+         urban = factor(X_URBSTAT, labels = c("1" = "urban", "2" = "rural")),
+         race = factor(X_IMPRACE, labels = c("1" = "white", "2" = "black", "3" = "asian", 
+                                             "4" = "american indian", "5" = "hispanic", "6" = "other")),
+         health = factor(X_RFHLTH, labels = c("1" = "good", "2" = "poor", "9" = NA)),
+         phys14d = factor(X_PHYS14D, labels = c("1" = "0", "2" = "1-13", "3" = "14+", "9" = NA)),
+         ment14d = factor(X_MENT14D, labels = c("1" = "0", "2" = "1-13", "3" = "14+", "9" = NA)),
+         exercise = factor(EXERANY2, labels = c("1"= "yes", "2" = "no", "7" = NA, "9" = NA)),
+         genhealth = factor(GENHLTH, labels =  c("1" = "excellent", "2" = "very good", "3" = "good",
+                                                 "4" = "fair", "5" = "poor", "7" = NA, "9" = NA)),
+         age = factor(X_AGE_G, labels = c("1" = "18-24", "2" = "25-34", "3" = "35-44",
+                                          "4" = "45-54", "5" = "55-64", "6" = "65+")),
+         income = factor(X_INCOMG, labels = c("1" = "<15000", "2" = "15000-24999", 
+                                              "3" = "25000-34999", "4" = "35000-49999", 
+                                              "5" = "50000+", "9" = NA), ordered = TRUE),
+         employed = factor(EMPLOY1, labels = c("1" = "Employed", "2" = "Self-employed", 
+                           "3" = "Out of work 1+ years", "4" = "Out of work <1 year", 
+                           "5" = "Homemaker", "6" = "Student", "7" = "Retired", "8" = "Unable to work",
+                           "9" = NA))) %>% # add these vars to calc
+  dplyr::select(-all_of(calc))
+
+# fix state name
+brfss <- tibble(oldstate = unique(as.numeric(brfss$X_STATE)), newstate = 1:51) %>%
+  right_join(brfss, by = c("oldstate" = "X_STATE")) %>%
+  right_join(statekey, by = c("newstate" = "num")) %>%
+  dplyr::select(-abb, -oldstate, -newstate) %>%
+  dplyr::mutate(name = as.factor(name))
+
+###############################################################################
+# dictionary: https://www.datafiles.samhsa.gov/sites/default/files/field-uploads-protected/studies/N-MHSS-2020/N-MHSS-2020-datasets/N-MHSS-2020-DS0001/N-MHSS-2020-DS0001-info/N-MHSS-2020-DS0001-info-codebook.pdf
+nmhss <- read_csv("data/nmhss-puf-2020-csv.csv")
+
+ndem <- c("LST", "MHINTAKE", "MHDIAGEVAL", "TREATMT", "FACILITYTYPE", "FOCUS", "OWNERSHP", 
+         "PUBLICAGENCY", "RELIG", "NOTREAT", "ANTIPSYCH", "MHCASEMGMT", "MHCHRONIC", "PRIMARYCARE",
+         "DIETEXERCOUNSEL", "MHEDUCATION", "MHNOSVCS", "SRVC31", "NOSPECGRP", "LANG", "ADOPTSECLUSION",
+         "PAYASST", "LICENMH", "OTHFAC", "FACNUM", "IPSERV", "IPTOTAL")
+
+#: Clients received less-than-24-hour mental health treatment (outpatient and
+#partial hospitalization/day treatment) during April 2020 (Q.B5)
+
+apr2020 <- c("OPSERV", "OPTOTAL", "OPSEXTOTM", "OPSEXTOTF", "OPAGETOT017", "OPAGETOT1864", "OPAGETOT65",
+             "OPETHTOTHISP", "OPETHTOTNONHISP", "OPETHTOTUNK", "OPRACETOTINDIAN", "OPRACETOTASIAN", 
+             "OPRACETOTINDIAN", "OPRACETOTBLK", "OPRACETOTHAWPAC", "OPRACETOTWHIT", "OPRACETOTUNK",
+             "OPLEGALTOTVOL", "OPLEGALTOTNONFOREN", "OPLEGALTOTFOREN", "COD_PCT", "TOTADMIS", 
+             "PERCENTVA")
+
+treat <- c("TREATMT", "TREATPSYCHOTHRPY", "TREATFAMTHRPY", "TREATGRPTHRPY", "TREATCOGTHRPY", 
+           "TREATDIALTHRPY", "TREATCOGREM", "TREATBEHAVMOD", "TREATDUALMHSA", "TREATTRAUMATHRPY",
+           "TREATACTVTYTHRPY","TREATELECTRO", "TREATTMS", "TREATKIT", "TREATEMDR", "TREATTELEMEDINCE",
+           "TREATOTH", "ASSERTCOMM", "SED", "TAYOUNGADULTS", "SPMI", "SRVC63", "ALZHDEMENTIA", 
+           "SRVC31", "SPECGRPEATING", "FIRSTEPPSYCH", "SRVC122", "POSTTRAUM", "SRVC116", 
+           "TRAUMATICBRAIN", "SRVC113", "SRVC114", "SRVC115", "SRVC62", "SRVC61", "SRVC32", "SRVC35",
+           "NOSPECGRP")
+
+drug <- c("ANTIPSYCH", "CHLOR_NO", "CHLOR_ORAL", "CHLOR_INJ", "CHLOR_REC", "DROPE_NO", 
+          "DROPE_INJ", "FLUPH_NO", "FLUPH_ORAL", "FLUPH_INJ", "FLUPH_INJ", "HALOP_NO", 
+          "HALOP_ORAL", "HALOP_INJ", "HALOP_LAI", "LOXAP_NO", "LOXAP_ORAL", "LOXAP_INJ", 
+          "PERPH_NO", "PERPH_NO", "PERPH_ORAL", "PERPH_INJ", "PIMOZ_NO", "PIMOZ_ORAL", 
+          "PIMOZ_TOP", "PROCH_NO", "PROCH_ORAL", "PROCH_INJ", "PROCH_REC", "THIOT_NO", 
+          "THIOT_ORAL", "THIOT_INJ", "THIOR_NO", "THIOR_ORAL", "TRIFL_NO", "TRIFL_ORAL",
+          "TRIFL_INJ", "FSTGENOTH_NO", "FSTGENOTH_ORAL", "FSTGENOTH_INJ", "FSTGENOTH_LAI",
+          "FSTGENOTH_REC", "FSTGENOTH_TOP", "ARIPI_NO", "ARIPI_ORAL", "ARIPI_INJ", "ARIPI_LAI",
+          "ASENA_NO", "ASENA_ORAL", "ASENA_INJ", "BREXP_NO", "BREXP_ORAL", "CARIP_NO",
+          "CARIP_ORAL", "CLOZA_NO", "CLOZA_ORAL", "ILOPE_NO", "ILOPE_ORAL", "LURAS_NO", 
+          "LURAS_ORAL", "OLANZ_NO", "OLANZ_ORAL", "OLANZ_INJ", "OLANZ_LAI", "OLANZFLU_NO",
+          "OLANZFLU_ORAL", "PALIP_NO", "PALIP_ORAL", "PALIP_INJ", "PALIP_LAI", "QUETI_NO",
+          "QUETI_ORAL", "RISPE_NO", "RISPE_ORAL", "RISPE_INJ", "RISPE_LAI", "ZIPRA_NO", 
+          "ZIPRA_ORAL", "ZIPRA_INJ", "SECGEN1OTH_NO", "SECGEN1OTH_ORAL", "SECGEN1OTH_INJ",
+          "SECGEN1OTH_LAI", "SECGEN1OTH_REC", "SECGEN1OTH_TOP", "SECGEN2OTH_NO", "SECGEN2OTH_ORAL",
+          "SECGEN2OTH_INJ", "SECGEN2OTH_LAI", "SECGEN2OTH_REC", "SECGEN2OTH_TOP", "SECGEN3OTH_NO",
+          "SECGEN3OTH_ORAL", "SECGEN3OTH_INJ", "SECGEN3OTH_LAI", "SECGEN3OTH_REC", "SECGEN3OTH_TOP"
+          )
+
+management <- c("MHINTCASEMGMT", "MHCASEMGMT", "MHCOURTORDERED", "MHAOT", "MHCHRONIC", 
+                "ILLNESSMGMT", "PRIMARYCARE", "DIETEXERCOUNSEL", "FAMPSYCHED", "MHEDUCATION",
+                "MHHOUSING", "SUPPHOUSING",  "MHPSYCHREHAB", "MHVOCREHAB", "SUPPEMPLOY", "FOSTERCARE",
+                "MHLEGAL", "MHSUICIDE", "MHCONSUMER", "MHHBV", "MHHCV", "MHHIV", "MHSTD", "MHTB",
+                "MHTOBACCOUSE", "MHTOBACCOCESS", "MHNICOTINEREP", "SMOKINGCESSATION", "MHOTH",
+                "MHNOSVCS", "YNGCHLD", "CHILDREN", "ADOLES", "YOUNGADULTS", "ADULT", "SENIORS", 
+                "CRISISTEAM2", "PSYCHON", "PSYCHOFF","SIGNLANG", "LANG", "LANGPROV", "CONTED", 
+                "CASEREV", "QUALREV", "OUTFUP","CQIP", "SATSUR", "CPPR", "RCA", "SMOKINGPOLICY",
+                "USEDSECLUSION", "ADOPTSECLUSION", "FEESCALE", "PAYASST","REVCHK1", "REVCHK2",
+                "REVCHK8", "REVCHK5", "REVCHK10", "FUNDSMHA", "FUNDSTATEWELFARE","FUNDSTATEJUV",
+                "FUNDSTATEEDUC", "FUNDOTHSTATE", "FUNDLOCALGOV", "FUNDCSBG", "FUNDCMHG", "FUNDFEDGRANT",
+                "REVCHK15", "FUNDVA", "REVCHK17", "FUNDPRIVCOMM", "REVCHK2A", "LICENMH", "LICENSED",
+                "LICENPH", "LICENSEDFCS", "LICENHOS", "JCAHO", "CARF", "COA", "CMS", "OTHSTATE",
+                "OTHFAC", "FACNUM", "IPSERV", "IPTOTAL", "IPAGETOT017", "IPAGETOT1864", "IPAGETOT65")
+
+lang <- c("LANG", "LANGPROV", "LANG16", "LANG_B", "LANG1", "LANG2", "LANG3", "LANG21", "LANG4", "LANG5",
+           "LANG6", "LANG7", "LANG8", "LANG24", "LANG9", "LANG10", "LANG22", "LANG25", "LANG26", "LANG11",  
+           "LANG19", "LANG23", "LANG12", "LANG13", "LANG14", "LANG15", "LANG20", "LANG17", "LANG18")
+
+calc <- c("LANGPROV", "TOTADMIS", "OPLEGALTOTFOREN", "OPLEGALTOTNONFOREN", "OPLEGALTOTVOL", "OPRACETOTUNK",
+          "OPRACETOTMR", "OPRACETOTWHIT", "OPRACETOTHAWPAC", "OPRACETOTBLK", "OPRACETOTASIAN", "OPRACETOTINDIAN",
+          "OPETHTOTUNK", "OPETHTOTNONHISP", "OPETHTOTHISP", "OPAGETOT65", "OPAGETOT1864", "OPAGETOT017")
+suppressWarnings( # warning for factor length
+nmhss1 <- nmhss %>%
+ # dplyr::filter() %>%
+  dplyr::select(all_of(ndem), all_of(apr2020)) %>%
+  dplyr::mutate(across(all_of(apr2020), basiclayer),
+                across(all_of(ndem), basiclayer),
+                facilitytype = factor(FACILITYTYPE, labels = c("1" = "Psychiatric hospital",
+                                                               "2" = "Separate inpatient psychiatric unit of a general hospital",
+                                                               "3" = "Residential treatment center for children",
+                                                               "4" = "Residential treatment center for adults",
+                                                               "5" = "Other residential treatment facility",
+                                                               "6" = "Veterans Administration Medical Center (VAMC)",
+                                                               "7" = "Community Mental Health Center (CMHC)",
+                                                               "8" = "Certified Community Behavioral Health Clinic (CCBHC)",
+                                                               "9" = "Partial hospitalization/day treatment facility",
+                                                               "10" = "Outpatient MHF",
+                                                               "11" = "Multi-setting MHF",
+                                                               "12" = "Other")),
+                focus = factor(FOCUS, labels = c("1" = "Mental health treatment",
+                                                 "3" = "Mental health/substance abuse treatment",
+                                                 "4" = "General health care",
+                                                 "5" = "Other")),
+                ownership = factor(OWNERSHP, labels = c("1" = "Private for-profit organization",
+                                                        "2" = "Private non-profit organization",
+                                                        "3" = "Public agency or department")),
+                operator = factor(PUBLICAGENCY, labels = c("-2" = "logical skip",
+                                                           "1" = "State mental health authority (SMHA)",
+                                                           "2" = "Other state government agency or department",
+                                                           "3" = "Regional authority orgovernment",
+                                                           "4" = "Tribal government",
+                                                           "5" = "Indian Health Service",
+                                                           "6" = "Department of Veterans Affairs",
+                                                           "7" = "Other")),
+                facnum = factor(FACNUM, labels = c("-2" = "1",
+                                                   "1" = "2-5",
+                                                   "2" = "6-10",
+                                                   "3" = "11-30",
+                                                   "4" = "30+"))) %>%
+  dplyr::select(-FACILITYTYPE, -FOCUS, -OWNERSHP, -PUBLICAGENCY, -FACNUM)
+)
+# fix states, remove PR and oher
+nmhss1 <- right_join(nmhss1, statekey, by = c("LST" = "abb")) %>%
+  dplyr::select(-LST, -num)
+
+#remove objects
+rm(cdc)
+```
+
+I then grouped each dataset by state using another Rscipt.
+
+```{r, stategroup}
+require(dplyr)
+require(forcats)
+require(readxl)
+require(tidyr)
+require(purrr)
+require(rlang)
+
+## important vignette https://dplyr.tidyverse.org/articles/programming.html
+## and http://jonthegeek.com/2018/06/04/writing-custom-tidyverse-functions/
+
+####################################
+
+b1 <- brfss %>%
+  dplyr::select(-date, -PHYSHLTH, -MENTHLTH, -POORHLTH, -health, -HTM4, -WTKG3) %>%
+  dplyr::mutate(age = fct_collapse(age, "18-64" = c("18-24", "25-34", "35-44", "45-54", "55-64"), 
+                                   "65+" = c("65+"))) %>%
+  na.omit()
+  #pivot_wider(across(is.factor), id_cols = name)
+
+################ nmhss
+# list of #yes# vars using purrr
+yvar <- nmhss1 %>%
+  dplyr::select(where(~ "yes" %in% levels(.))) %>%
+  names()
+
+under <- function(x) {
+  str_extract(x, pattern = "[0-9]*")
+}
+
+lvar <- nmhss1 %>%
+  dplyr::select(where(~ "1-10" %in% levels(.))) %>%
+  names()
+
+### for state
+n1 <- nmhss1 %>%
+  
+  #### yessing but needs to be done with 1 row per facility
+  group_by(name) %>%
+  mutate(across(all_of(yvar), .fns = list(count = ~sum(. == "yes"))),
+         TOT = n(),
+         across(all_of(lvar), .fns = list(lbound = ~sum(as.numeric(under(.x)), na.rm = TRUE)))) %>%
+  dplyr::select(-all_of(yvar), -all_of(lvar), -facnum, -OTHFAC)
+
+fvars <- c("facilitytype", "ownership", "focus", "operator")
+
+n2 <- tibble(name = statekey$name)
+######
+
+factype <- n1 %>%
+  group_by(name) %>%
+  dplyr::count(facilitytype, .drop = TRUE) %>%
+  pivot_wider(names_from = facilitytype, values_from = n)
+
+ownship <- n1 %>%
+  group_by(name) %>%
+  dplyr::count(ownership, .drop = TRUE) %>%
+  pivot_wider(names_from = ownership, values_from = n)
+
+focus <- n1 %>%
+  group_by(name) %>%
+  dplyr::count(focus, .drop = TRUE) %>%
+  pivot_wider(names_from = focus, values_from = n)
+
+operator <- n1 %>%
+  group_by(name) %>%
+  dplyr::count(operator, .drop = TRUE) %>%
+  pivot_wider(names_from = operator, values_from = n)
+
+n2 <- left_join(n1, factype) %>%
+  left_join(ownship) %>%
+  left_join(focus) %>%
+  left_join(operator) %>%
+  dplyr::select(-all_of(fvars)) %>%
+  distinct()
+```
+
+For the purposes of contextualizing state-specific results with respect to their population, I also found 2020 estimates from the US Census Bureau.
+
+```{r, other data}
+### extra data
+#population stats
+pop <- read_csv("data/census2020pop.csv") %>%
+  dplyr::mutate(name = tolower(NAME)) %>%
+  right_join(statekey, by = "name") %>%
+  summarise(name, abb, num, pop = ESTIMATESBASE2020, per = pop / sum(ESTIMATESBASE2020))
+```
+
+## Data Visualization 6
+
+I conducted a fair bit of exploratory analysis for the datasets I chose. I'll just show a few of these here. More can be found later in this report. I really wanted to focus on som variables I thought might be interesting instead trying to visualize large pictures of the data.
+
+First, I looked at the obvious from BRFSS-- mental health. There was really only one variable that answered this question:
+
+Now thinking about your mental health, which includes stress, depression, and problems with emotions, for 
+how many days during the past 30 days was your mental health not good? 
+
+Responses were encoded as the number of days, and then later categorized into one of 3 intervals. 0 days, 1-13 days, or 14+ days.
+
+```{r dviz1}
+p <- brfss %>% 
+  ggplot() +
+  geom_bar(aes(x = phys14d, fill = phys14d)) +
+  scale_y_continuous(limits = c(0, 300000), labels = comma) +
+  labs(x = "Phsyical Health", y = "Count") +
+  ljtheme() +
+  guides(fill = "none")
+
+m <- brfss %>%
+  ggplot() +
+  geom_bar(aes(x = ment14d, fill = ment14d)) +
+  scale_y_continuous(limits = c(0, 300000), labels = comma) +
+  labs(x = "Mental Health", y = "Count") +
+  ljtheme() +
+  guides(fill = "none")
+  
+title <- ggdraw() + 
+  draw_label(
+    "Number of Days per Month Respondants Had a \"Bad Day\"",
+    fontface = 'bold',
+    x = 0,
+    hjust = -.1,
+    color = blue
+  )
+
+plot_grid(title, plot_grid(p, m, align = "vh"), nrow = 2, rel_heights = c(0.1, 1))
+```
+
+If we want to look at  the relationship between physical and mental "bad health days", we can do this:
+
+```{r dviz2}
+brfss %>%
+  dplyr::filter(MENTHLTH < 31, PHYSHLTH < 31) %>%
+  ggplot() +
+  geom_point(aes(x = MENTHLTH, y = PHYSHLTH), alpha = 0.05) +
+  labs(title = "Number of days ____ health was not good")
+```
+
+This plot was far from useful, and made me realize that the nature of this data was different from anything I had worked with before. Because it was direct survey data, people chose to answer with "5" instead of "6" because 5 goes nicely into 30, is the length of the work week, etc. I resorted to using 14-day categories to represent mental health which is much less precise, but more accurate.
+
+Next I just surveyed a few of the other variables like the ones below.
+
+```{r dviz3}
+#medical cost
+brfss %>%
+  dplyr::filter(MEDCOST %in% c(1, 2)) %>%
+  ggplot() + geom_bar(aes(x = MEDCOST)) + scale_y_continuous(labels = comma) +
+  scale_x_discrete(limits = c("Yes", "No")) +
+  labs(caption = "BRFSS",
+       x = "Was there a time in the past 12 months when you needed to see a doctor \nbut could not because of cost?")
+
+#checkup
+brfss %>%
+  dplyr::filter(CHECKUP1 %in% c(1, 2, 3, 4)) %>%
+  ggplot() + geom_bar(aes(x = CHECKUP1)) + scale_y_continuous(labels = comma) +
+  scale_x_discrete(limits = c("< 1 year", "< 2 years", "< 5 years", "5+ years")) +
+  labs(caption = "BRFSS",
+       x = "About how long has it been since you last visited a doctor for a routine checkup?")
+```
+
+I looked around the N-MHSS data as well.
+
+```{r dviz4}
+
+nmhss1 %>%
+  dplyr::filter(IPTOTAL != "logical skip") %>%
+  ggplot() +
+  geom_bar(aes(x = IPTOTAL), fill = pal[7]) +
+  labs(x = "Total number of patients receiving 24-hour hospital inpatient \nmental health treatment",
+       caption = "N-MHSS",
+       title = "Inpatient Count for each Facility",
+       subtitle = "On April 30th, 2020") +
+  theme(axis.text.x = element_text(angle = 10, vjust = .90))
+
+```
+
+
+At this point, I realized that I might not have enough time to fully explore the data, so I decided to just get to the main question of my analysis and look and mental health, mental health facilities, and their ability to treat patients.
+
+Here I began to look at state ranks and state-specific characteristics. I found the states with the highest percentage of people who reported that they had at 14 or more bad mental health days per month. This actual metric is a little wordy, but I believe that this can be used, for my purposes, as a measure of the severity of mental health in each state. While frequency of symptoms doesn't necessarily correlate to the severity of the case, this data suits my needs and any further research should take this into account.
+
+```{r dviz 5}
+#top 10 mhd 14+
+mhd14top <- b1 %>%
+  group_by(name) %>%
+  summarise(per = sum(ifelse(ment14d == "14+", 1, 0))/n(), rank = 1) %>%
+  distinct() %>%
+  arrange(desc(per)) %>%
+  head(10)
+
+# bottom 10 mhd14+
+mhd14bottom <- b1 %>%
+  group_by(name) %>%
+  summarise( per = sum(ifelse(ment14d == "14+", 1, 0))/n(), rank = 2) %>%
+  distinct() %>%
+  arrange(desc(per)) %>%
+  tail(10)
+
+bind_rows(mhd14top, mhd14bottom) %>%
+  ggplot() + geom_bar(aes(x = reorder(name, -per), y = per * 100, fill = rank), stat = "identity") +
+  guides(fill = "none") +
+  labs(x = "", y = "Percent", title = "Percentage of Respondents Who Had 14+ Bad Mental Health Days",
+       subtitle = "By State, Top 10 and Bottom 10", caption = "BRFSS") +
+  theme(axis.text.x = element_text(angle = 20))
+```
+
+By this metric, Kentucky is the least mentally healthy state in the US, followed by West Virginia and Tennessee. Among the most mentally healthy states are South and North Dakota, and Wyoming.
+
+Since it was difficult for me to conceptualize these states independently, I was curious to see the results on a chloropleth map. I also decided to change the cutoff to at least one bad mental health day.
+
+```{r dviz6}
+# chloropleth
+us_states <- map_data("state")
+
+# % who had > 13 bad MHD
+data <- b1 %>%
+  group_by(name) %>%
+  summarise( per = sum(ifelse(ment14d != "0", 1, 0))/n()) %>%
+  distinct() %>%
+  right_join(us_states, by = c("name" = "region"))
+
+ggplot(data, aes(x = long, y = lat,
+                group = group, fill = per * 100)) +
+  coord_map(projection = "albers", lat0 = 39, lat1 = 45) +
+  geom_polygon(color = "#8d99ae", size = 0.1) +
+  theme_map() + labs(fill = "Percent", title = "Percentage of Respondents Who Had \nat Least 1 Bad Mental Health Days",
+                     caption = "Data provided by BRFSS") + 
+  scale_fill_distiller(palette = "Spectral") +
+  theme(text = element_text(size = 10))
+```
+
+Here we can see the attention shift over to the west coast, with California and Utah having the highest rates. The Dakotas and Wyoming still remain among the states with the best mental health.
+
+I also looked at the total number of mental health facilities and the number of facilities per capita. After this, I was ready to begin my analysis.
+
+```{r dviz7}
+# total MHF
+data <- n1 %>%
+  summarise(TOT, name) %>%
+  distinct() %>%
+  right_join(us_states, by = c("name" = "region"))
+
+ggplot(data, aes(x = long, y = lat,
+                group = group, fill = TOT)) +
+  coord_map(projection = "albers", lat0 = 39, lat1 = 45) +
+  geom_polygon(color = "#8d99ae", size = 0.1) +
+  theme_map() + labs(fill = "Percent", title = "Total Number of Mental Health Facilities",
+                     caption = "Data provided by SAMSA.gov") + 
+  scale_fill_distiller(palette = "Spectral") +
+  theme(text = element_text(size = 10))
+
+# Number of MHF per cap
+data <- n1 %>%
+  dplyr::select(name, TOT) %>%
+  distinct() %>%
+  left_join(us_states, by = c("name" = "region")) %>%
+  left_join(pop, by = c("name"))
+
+ggplot(data, aes(x = long, y = lat,
+                group = group, fill = TOT/pop * 100,000)) +
+  coord_map(projection = "albers", lat0 = 39, lat1 = 45) +
+  geom_polygon(color = "#8d99ae", size = 0.1) +
+  theme_map() + labs(fill = "Rate per 100,000", title = "Number of Mental Health Facilities per Capita",
+                     caption = "Data provided by SAHMSA.gov") + 
+  scale_fill_distiller(palette = "Spectral") +
+  theme(text = element_text(size = 10))
+```
+It's a bit odd that Maine is such an outlier in this category, but I couldn't find any articles explaining why.
+
+================================================================================
+
+# Correlations 6
+
+Before modeling, its useful to quickly explore relationships between some variables. Here, I explored some correlations.
+
+```{r cor}
+# facilities per state vs bad mhd > 0
+
+pcor <- n1 %>%
+  dplyr::select(TOT) %>%
+  distinct() %>%
+  na.omit()
+
+mcor <- b1 %>%
+  group_by(name) %>%
+  summarise(per = sum(ifelse(ment14d != "0", 1, 0))/n()) %>%
+  distinct()
+
+data <- left_join(pcor, mcor, by = "name")
+  
+cat("Number of Facilities vs. At Least 1 Bad Mental Health Day: \n", cor(data$TOT, data$per))
+
+# facilities per state vs bad mhd > 13
+pcor <- n1 %>%
+  dplyr::select(TOT) %>%
+  distinct() %>%
+  na.omit()
+
+mcor <- b1 %>%
+  group_by(name) %>%
+  summarise(per = sum(ifelse(ment14d == "14+", 1, 0))/n()) %>%
+  distinct()
+
+data <- left_join(pcor, mcor, by = "name")
+  
+cat("Number of Facilities vs. 14+ Bad Mental Health Days \n", cor(data$TOT, data$per))
+
+# how may for just facilities that focus on mental health?
+pcor <- n1 %>%
+  dplyr::filter(focus == "Mental health treatment") %>%
+  group_by(name) %>%
+  dplyr::summarise(TOT = n()) %>%
+  distinct() %>%
+  na.omit()
+
+mcor <- b1 %>%
+  group_by(name) %>%
+  summarise( per = sum(ifelse(ment14d != "0", 1, 0))/n()) %>%
+  distinct()
+
+data <- left_join(pcor, mcor, by = "name")
+
+cat("Number of MHF vs. At Least 1 Bad Mental Health Day: \n", cor(data$TOT, data$per))
+
+ggplot(data) +
+  geom_text_repel(aes(x = per, y = TOT, label = name), size = 3) +
+  labs(x = "Percent of Respondents who had at Least 1 Bad Mental Health Day",
+       y = "Number of MHF", 
+       title = "Mental Health Need and Availability",
+       subtitle = "Facilities with MHT focus")
+
+## what about MHF per capita?
+# bad mhd > 0
+
+pcor <- n1 %>%
+  dplyr::select(name, TOT) %>%
+  distinct() %>%
+  left_join(pop, by = c("name")) %>%
+  dplyr::summarise(name, pcap = TOT/pop) %>%
+  na.omit()
+
+mcor <- b1 %>%
+  group_by(name) %>%
+  summarise(per = sum(ifelse(ment14d != "0", 1, 0))/n()) %>%
+  distinct()
+
+data <- left_join(pcor, mcor, by = "name")
+
+cat("MHF per capita vs. At Least 1 Bad Mental Health Day: \n", cor(data$pcap, data$per))
+
+# bad mhd > 13
+pcor <- n1 %>%
+  dplyr::select(name, TOT) %>%
+  distinct() %>%
+  left_join(pop, by = c("name")) %>%
+  dplyr::summarise(name, pcap = TOT/pop) %>%
+  na.omit()
+
+mcor <- b1 %>%
+  group_by(name) %>%
+  summarise(per = sum(ifelse(ment14d == "14+", 1, 0))/n()) %>%
+  distinct()
+
+data <- left_join(pcor, mcor, by = "name")
+
+cat("Number of Facilities Per Capita vs. 14+ Bad Mental Health Days: \n", cor(data$pcap, data$per))
+```
+
+There are a few interesting things to note here. First, on average, splitting the data into 0/ 1+ showed more correlation than the 0-13/14+ split. My guess is that this is because the 0/1+ split separated the categories more evenly into groups, giving more potential variation across the split. In another correlation, I selected for facilities that only supply services for mental health. Its important to remember that we have a wide variety of facility types in the dataset. While they all relate to mental health, they might not be able to equally provide certain services, i.e. substance abuse or severe mental disorders.
+
+# Modeling 6
+
+To describe these relationships statistically, I chose to create some simple linear models. I first wanted to focus on just the relationship between MHF per capita and mental health by formalizing the correlations and by taking a quick look at other factors in the facilities survey that might be associated with mental health. I'm looking to see that the density of mental health facilities by state are dependent on the state of mental health.
+
+First, I tried some easy logistic regression to see if there were any interesting hits in the BRFSS dataset that could predict the At Least One Bad Mental Health Day variable.
+
+Next, I formalized the state-specific reationship between 
+
+```{r mod}
+data <- b1 %>%
+  dplyr:::mutate(ment14d = ifelse(ment14d == "0", 0, 1))
+
+# model
+mod1 <- glm(formula = factor(ment14d) ~ ., data = data, family = "binomial")
+summary(mod1)
+
+# accuracy
+pred <- predict(mod1, dplyr::select(data,  -ment14d), type = "response")
+cmatrix <- data.frame(y = data$ment14d, pred = round(pred)) %>%
+  dplyr::mutate(result = ifelse(y == pred, 1, 0))
+table(actual = cmatrix$y, pred = cmatrix$pred)
+sum(cmatrix$result)/nrow(cmatrix)
+
+# remove lowest predictors
+
+data <- data %>%
+  dplyr::select(-metro, -genhealth, -age)
+
+# model
+mod2 <- glm(formula = factor(ment14d) ~ ., data = data, family = "binomial")
+summary(mod2)
+
+# accuracy
+pred <- predict(mod2, dplyr::select(data,  -ment14d), type = "response")
+cmatrix <- data.frame(y = data$ment14d, pred = round(pred)) %>%
+  dplyr::mutate(result = ifelse(y == pred, 1, 0))
+table(actual = cmatrix$y, pred = cmatrix$pred)
+sum(cmatrix$result)/nrow(cmatrix)
+```
+
+There's not too much exciting results here. Not suprisingly, its pretty difficult to predict mental health. Looking at the confusion matrices, the model didn't really seem to bias one way or the other, it just didn't have enough information.
+
+
+I formalized a descriptive model for mental health state and the concentration of facilities.
+
+```{r mod2}
+#get y and x
+y <- b1 %>%
+  group_by(name) %>%
+  summarise(per = sum(ifelse(ment14d != "0", 1, 0))/n()) %>%
+  distinct()
+  
+
+data <- n1 %>%
+  dplyr::select(name, TOT) %>%
+  distinct() %>%
+  left_join(pop, by = c("name")) %>%
+  dplyr::summarise(name, pcap = TOT/pop) %>%
+  left_join(y, by = "name")
+
+# lm
+mod3 <- lm(per ~ pcap, data = data)
+summary(mod3)
+
+# plot
+pcor <- n1 %>%
+  dplyr::select(name, TOT) %>%
+  distinct() %>%
+  left_join(pop, by = c("name")) %>%
+  dplyr::summarise(name, pcap = TOT/pop) %>%
+  na.omit()
+
+mcor <- b1 %>%
+  group_by(name) %>%
+  summarise(per = sum(ifelse(ment14d != "0", 1, 0))/n()) %>%
+  distinct()
+
+data <- left_join(pcor, mcor, by = "name")
+
+a <- ggplot(data, aes(x = per, y = pcap, label = name)) +
+  geom_text(size = 3) +
+  labs(x = "Percent of Respondents who had at Least 1 Bad Mental Health Day",
+       y = "MHF per Capita", 
+       title = "Mental Health Need and Availability") +
+  geom_smooth(formula = y ~ x, method = "lm", lty = 2, se = FALSE)
+
+a
+
+```
+
+We found an insignificant between the number of facilities and the rate of poor mental health. It's not close to being significant, so we can say that there isn't any association between the need and what's available with respect to mental health services. Compared to the intercept, however, the p-value is quite low. Considering the meager results from this analysis with as much simplicity as possible, I'm doubtful that another method would detect a true, consistent relationship between the two.
+
+# Discussion 6
+
+Overall, the results indicate a dissociation between the needs of the people and the available care. Before discussing possible conclusions, I want to stress that this analysis was pretty general. It looked at approximations of mental health collected by survey data and compared it to the availability of facilities across the U.S.. Based on these metrics, there appeared to be no significant relationship between the two, but that doesn't mean that there truly is no relationship. Looking at all states and and facilities in the U.S. may have been a bit of a reach on my part, and may have missed some opportunities for findings. Just because the results were not significant when grouped together doesn't indicate any strict lack of association. There may be cases where the availability of MHFs is proportional to the need expressed in that region, but without obtaining more granular data or focusing my analysis onto a smaller region these effects remain undetected. Nonetheless, the lack of association between the two does raise some concerns. Especially in such a turbulent time, there should be adequate infrastructure to support the mental health needs of each population. This analysis doesn't claim that there is any immediate cause for alarm. It may be used as a warning and as a starting point for further analysis. States like Kentucky and West Virginia that have a high rate of mental health issues ought to take note and encourage their population to seek help. Texas, in its grand size, has remarkably few MHFs per capita, so it would do well to invest in more services for its people. If mental health needs ever exceed those of today, states may be adequately prepared.
+
+With that said, I recognize that this project leaves a lot to be desired. For one, the survey data from the BRFSS may not be the best way to describe in detail the state of mental health across the country. While it had a large sample size, I was really only able to extract a single metric of mental health. With more time and resources, I may have been able to dig around in the data a bit more and find other data that could be included in a model of mental health. Additionally, the relationship between the mental health needs and the availability of care is described indirectly by the chosen metrics. This analysis doesn't consider the space these MHFs have to support patients, or the other obstacles associated with receiving care, like distance.
+
+
+On a reflective note, I think I could have chosen a smaller dataset or datasets to use for my analysis. Most of the challenges came from understanding such a large amount of data and manipulating it to my wishes. Had I grabbed a smaller chunk, I could have focused in on a more specific question and increased the power and precision of my analysis.
+
+# Future directions
+
+There are a few directions that may be interesting to explore. When considering the availability of care, distance is a large obstacle. Spatially, to conduct a proper analysis, one could use more precise latitude and longitude data of MHFs to compute and analyze the average driving distance from each region or state and the nearest MHF. Of course, many patients take up some kind of residence in these places but the initial travel still presents an issue for some people. The N-MHFS also has data on financing and treatment type. I think it would be interesting to look into the financing of mental health treatment, as this is another major obstacle in receiving care. Under perfect conditions, there ought to be some relationship between the financial needs of those receiving mental health treatment and the kind of financial subsidies or grants that states and facilities offer. Many of these questions may be best answered first on a small scale. With effort, these analyis provides a jumping-off point to further examine the relationship between needs and existing facilities to provide the right treatment and facility for the right people. 
+
+# Acknowledgements 6
+
+Author: Keaton Markey
+Project completed for DSCI 352, Spring 2022
+Case Western Reserve University
+
+# References 6
+
+  - [BRFSS User Guide](https://www.cdc.gov/brfss/data_documentation/pdf/UserguideJune2013.pdf)
+  - [BRFSS Codebook](https://www.cdc.gov/brfss/annual_data/2020/pdf/codebook20_llcp-v2-508.pdf)
+  - [N-MHSS Codebook](https://www.datafiles.samhsa.gov/sites/default/files/field-uploads-protected/studies/N-MHSS-2020/N-MHSS-2020-datasets/N-MHSS-2020-DS0001/N-MHSS-2020-DS0001-info/N-MHSS-2020-DS0001-info-codebook.pdf)
+
+
+________________________________________________________________________________
+
+
+# Executive Summary 5
+
+This report I began to combine the two datasets to analyze related components. This week was focused on state merging.
+
+# Introduction 5
+
+See [Introduction 4]
+
+# Data Science Methods 5
+
+This week I did a lot of reformatting to get merged dfs. I was able to do all of this using {dplyr}. I also did a simple correlation test to see how closely the number of mental health facilities was associated with how severe their mental health situation is. 
+
+# Exploratory Analyisis 5
+
+## Data Visualization 5
+
+```{r}
+# how many faclities per state?
+n1 %>%
+  dplyr::select(TOT, name) %>%
+  distinct() %>%
+  arrange(desc(TOT)) %>%
+  head(10)
+
+# how many eper capita?
+n1 %>%
+  left_join(pop, by = "name") %>%
+  dplyr::select(TOT, name, pop) %>%
+  dplyr::mutate(per_capita = TOT/pop) %>%
+  distinct() %>%
+  arrange(desc(per_capita)) %>%
+  head(10)
+
+#top 10 mhd 14+
+mhd14top <- b1 %>%
+  group_by(name) %>%
+  summarise(per = sum(ifelse(ment14d == "14+", 1, 0))/n(), rank = 1) %>%
+  distinct() %>%
+  arrange(desc(per)) %>%
+  head(10)
+
+# bottom 10 mhd14+
+mhd14bottom <- b1 %>%
+  group_by(name) %>%
+  summarise( per = sum(ifelse(ment14d == "14+", 1, 0))/n(), rank = 2) %>%
+  distinct() %>%
+  arrange(desc(per)) %>%
+  tail(10)
+
+#plot together
+bind_rows(mhd14top, mhd14bottom) %>%
+  ggplot() + geom_bar(aes(x = reorder(name, -per), y = per * 100, fill = rank), stat = "identity") +
+  guides(fill = "none") +
+  labs(x = "", y = "Percent", title = "Percentage of Respondents Who Had 14+ Bad Mental Health Days",
+       subtitle = "By State, Top 10 and Bottom 10", caption = "BRFSS") +
+  theme(axis.text.x = element_text(angle = 20))
+
+# chloropleth
+us_states <- map_data("state")
+
+# % who had > 13 bad MHD
+data <- b1 %>%
+  group_by(name) %>%
+  summarise( per = sum(ifelse(ment14d == "14+", 1, 0))/n()) %>%
+  distinct() %>%
+  right_join(us_states, by = c("name" = "region"))
+
+p <- ggplot(data, aes(x = long, y = lat,
+                group = group, fill = per * 100)) +
+  coord_map(projection = "albers", lat0 = 39, lat1 = 45) +
+  geom_polygon(color = "#8d99ae", size = 0.1) +
+  theme_map() + labs(fill = "Percent", title = "Percentage of Respondents Who Had \n14+ Bad Mental Health Days",
+                     caption = "Data provided by BRFSS") + 
+  scale_fill_distiller(palette = "Spectral") +
+  theme(text = element_text(size = 10))
+
+# Number of MHF per cap
+data <- n1 %>%
+  dplyr::select(name, TOT) %>%
+  distinct() %>%
+  left_join(us_states, by = c("name" = "region")) %>%
+  left_join(pop, by = c("name"))
+
+q <- ggplot(data, aes(x = long, y = lat,
+                group = group, fill = TOT/pop * 100,000)) +
+  coord_map(projection = "albers", lat0 = 39, lat1 = 45) +
+  geom_polygon(color = "#8d99ae", size = 0.1) +
+  theme_map() + labs(fill = "Rate per 100,000", title = "Number of Mental Health Facilities per Capita",
+                     caption = "Data provided by SAHMSA.gov") + 
+  scale_fill_continuous(labels = comma) +
+  scale_fill_distiller(palette = "Spectral") +
+  theme(text = element_text(size = 10))
+q
+# for at least 1
+data <- b1 %>%
+  group_by(name) %>%
+  summarise( per = sum(ifelse(ment14d != "0", 1, 0))/n()) %>%
+  distinct() %>%
+  right_join(us_states, by = c("name" = "region"))
+
+r <- ggplot(data, aes(x = long, y = lat,
+                group = group, fill = per * 100)) +
+  coord_map(projection = "albers", lat0 = 39, lat1 = 45) +
+  geom_polygon(color = "#8d99ae", size = 0.1) +
+  theme_map() + labs(fill = "Percent", title = "Percentage of Respondents Who Had at \nLeast 1 Bad Mental Health Day",
+                     caption = "Data provided by BRFSS") + 
+  scale_fill_distiller(palette = "Spectral") +
+  theme(text = element_text(size = 10))
+
+# total MHF
+data <- n1 %>%
+  summarise(TOT, name) %>%
+  distinct() %>%
+  right_join(us_states, by = c("name" = "region"))
+
+o <- ggplot(data, aes(x = long, y = lat,
+                group = group, fill = TOT)) +
+  coord_map(projection = "albers", lat0 = 39, lat1 = 45) +
+  geom_polygon(color = "#8d99ae", size = 0.1) +
+  theme_map() + labs(fill = "Percent", title = "Total Number of Mental Health Facilities",
+                     caption = "Data provided by N-MHSS") + 
+  scale_fill_distiller(palette = "Spectral") +
+  theme(text = element_text(size = 10))
+
+grid.arrange(o, p, q, r, nrow = 2)
+
+# top 10 phd14+
+phd14top <- b1 %>%
+  group_by(name) %>%
+  summarise(per = sum(ifelse(phys14d == "14+", 1, 0))/n(), rank = 1) %>%
+  distinct() %>%
+  arrange(desc(per)) %>%
+  head(10)
+
+# bottom 10 phd14+
+phd14bottom <- b1 %>%
+  group_by(name) %>%
+  summarise(per = sum(ifelse(phys14d == "14+", 1, 0))/n(), rank = 2) %>%
+  distinct() %>%
+  arrange(desc(per)) %>%
+  tail(10)
+
+# plot together
+bind_rows(phd14top, phd14bottom) %>%
+  ggplot() + geom_bar(aes(x = reorder(name, -per), y = per * 100, fill = rank), stat = "identity") +
+  guides(fill = "none") +
+  labs(x = "", y = "Percent", title = "Percentage of Respondents Who Had 14+ Bad Physical Health Days",
+       subtitle = "By State", caption = "BRFSS") +
+  theme(axis.text.x = element_text(angle = 20))
+
+```
+
+
+```{r}
+# ############### not 0 days #############################################
+#top 10 mhd 14+
+mhdn0top <- b1 %>%
+  group_by(name) %>%
+  summarise(per = sum(ifelse(ment14d != "0", 1, 0))/n(), rank = 1) %>%
+  distinct() %>%
+  arrange(desc(per)) %>%
+  head(10)
+
+# bottom 10 mhd14+
+mhdn0bottom <- b1 %>%
+  group_by(name) %>%
+  summarise(per = sum(ifelse(ment14d != "0", 1, 0))/n(), rank = 2) %>%
+  distinct() %>%
+  arrange(desc(per)) %>%
+  tail(10)
+
+#plot together
+bind_rows(mhdn0top, mhdn0bottom) %>%
+  ggplot() + geom_bar(aes(x = reorder(name, -per), y = per * 100, fill = rank), stat = "identity") +
+  guides(fill = "none") +
+  labs(x = "", y = "Percent", title = "Percentage of Respondents Who Had \nAt Least 1 Bad Mental Health Day",
+       subtitle = "By State, Top 10 and Bottom 10", caption = "BRFSS") +
+  theme(axis.text.x = element_text(angle = 20))
+
+# top 10 phd14+
+phdn0top <- b1 %>%
+  group_by(name) %>%
+  summarise(per = sum(ifelse(phys14d != "0", 1, 0))/n(), rank = 1) %>%
+  distinct() %>%
+  arrange(desc(per)) %>%
+  head(10)
+
+# bottom 10 phd14+
+phdn0bottom <- b1 %>%
+  group_by(name) %>%
+  summarise(per = sum(ifelse(phys14d != "0", 1, 0))/n(), rank = 2) %>%
+  distinct() %>%
+  arrange(desc(per)) %>%
+  tail(10)
+
+# plot together
+bind_rows(phdn0top, phdn0bottom) %>%
+  ggplot() + geom_bar(aes(x = reorder(name, -per), y = per * 100, fill = rank), stat = "identity") +
+  guides(fill = "none") +
+  labs(x = "", y = "Peercent", title = "Percentage of Respondents Who Had \nAt Least 1 Bad Physical Health Day",
+       subtitle = "By State, Top 10 and Bottom 10", caption = "BRFSS") +
+  theme(axis.text.x = element_text(angle = 20))
+```
+
+## Summary 5
+
+See [Summary 4]
+
+## Data Cleaning 5
+
+For cleaning, I continued to recode some of the variables, and to sum up counts mostly conditional statements. I grabbed estimated 2020 population from the US Census website.
+
+# Correlations 5
+
+```{r corr 6}
+# facilities per state vs bad mhd > 0
+pcor <- n1 %>%
+  dplyr::select(TOT) %>%
+  distinct() %>%
+  na.omit()
+
+mcor <- b1 %>%
+  group_by(name) %>%
+  summarise( per = sum(ifelse(ment14d != "0", 1, 0))/n()) %>%
+  distinct()
+
+data <- left_join(pcor, mcor, by = "name")
+  
+cor(data$TOT, data$per)
+
+# facilities per state vs bad mhd > 13
+pcor <- n1 %>%
+  dplyr::select(TOT) %>%
+  distinct() %>%
+  na.omit()
+
+mcor <- b1 %>%
+  group_by(name) %>%
+  summarise(per = sum(ifelse(ment14d == "14+", 1, 0))/n()) %>%
+  distinct()
+
+data <- left_join(pcor, mcor, by = "name")
+  
+cor(data$TOT, data$per)
+
+# bad mhd > 0 was more highly correlated
+
+# how may for just facilities that focus on mental health?
+pcor <- n1 %>%
+  dplyr::filter(focus == "Mental health treatment") %>%
+  group_by(name) %>%
+  dplyr::summarise(TOT = n()) %>%
+  distinct() %>%
+  na.omit()
+head(pcor, 10)
+
+mcor <- b1 %>%
+  group_by(name) %>%
+  summarise( per = sum(ifelse(ment14d != "0", 1, 0))/n()) %>%
+  distinct()
+
+data <- left_join(pcor, mcor, by = "name")
+
+cor(data$TOT, data$per)
+
+ggplot(data) +
+  geom_text_repel(aes(x = per, y = TOT, label = name), size = 3) +
+  labs(x = "Percent of Respondents who had at Least 1 Bad Mental Health Day",
+       y = "Number of MHF", 
+       title = "Mental Health Need and Availability",
+       subtitle = "Facilities with MHT focus")
+
+## what about MHF per capita?
+# bad mhd > 0
+
+pcor <- n1 %>%
+  dplyr::select(name, TOT) %>%
+  distinct() %>%
+  left_join(pop, by = c("name")) %>%
+  dplyr::summarise(name, pcap = TOT/pop) %>%
+  na.omit()
+
+mcor <- b1 %>%
+  group_by(name) %>%
+  summarise(per = sum(ifelse(ment14d != "0", 1, 0))/n()) %>%
+  distinct()
+
+data <- left_join(pcor, mcor, by = "name")
+
+cor(data$pcap, data$per)
+
+# bad mhd > 13
+pcor <- n1 %>%
+  dplyr::select(name, TOT) %>%
+  distinct() %>%
+  left_join(pop, by = c("name")) %>%
+  dplyr::summarise(name, pcap = TOT/pop) %>%
+  na.omit()
+
+mcor <- b1 %>%
+  group_by(name) %>%
+  summarise(per = sum(ifelse(ment14d == "14+", 1, 0))/n()) %>%
+  distinct()
+
+data <- left_join(pcor, mcor, by = "name")
+
+cor(data$pcap, data$per)
+```
+
+# Modeling 5
+
+Here, I wanted to see how statistically significant the relationship between the number of facilities and the state of mental health described by respondents from the BRFSS survey was.
+
+```{r}
+pcor <- n1 %>%
+  dplyr::select(name, TOT) %>%
+  distinct() %>%
+  na.omit()
+
+mcor <- b1 %>%
+  group_by(name) %>%
+  summarise(per = sum(ifelse(ment14d != "0", 1, 0))/n()) %>%
+  distinct()
+
+data <- left_join(pcor, mcor, by = "name")
+
+a <- ggplot(data, aes(x = per, y = TOT, label = name)) +
+  geom_text(size = 3) +
+  labs(x = "Percent of Respondents who had at Least 1 Bad Mental Health Day",
+       y = "Number of MHF", 
+       title = "Mental Health Need and Availability") +
+  geom_smooth(formula = y ~ x, method = "lm", lty = 2, se = FALSE)
+
+a
+
+### simple linear mod
+mod1 <- lm(TOT ~ per, data = data)
+summary(mod1)
+
+# facility count vs 14+ bad mhds
+pcor <- n1 %>%
+  dplyr::select(TOT) %>%
+  distinct() %>%
+  na.omit()
+
+mcor <- b1 %>%
+  group_by(name) %>%
+  summarise(per = sum(ifelse(ment14d == "14+", 1, 0))/n()) %>%
+  distinct()
+
+data <- left_join(pcor, mcor, by = "name")
+
+b <- ggplot(data, aes(x = per, y = TOT, label = name)) +
+  geom_text(size = 3) +
+  labs(x = "Percent of Respondents who had 14+ Bad Mental Health Days",
+       y = "Number of MHF", 
+       title = "Mental Health Need and Availability") +
+  geom_smooth(method = "lm", lty = 2, se = FALSE)
+
+b
+
+## simple linear model
+mod2 <- lm(TOT ~ per, data = data)
+summary(mod2)
+```
+
+By Focus/ Substance Abuse
+```{r}
+# substance abuse
+n1 %>%
+  dplyr::filter(name == "ohio") %>%
+  dplyr::summarise(name, sum(focus == "Mental health/substance abuse treatment")/n())
+
+n1 %>%
+  group_by(name) %>%
+  dplyr::summarise(name, per = sum(focus == "Mental health/substance abuse treatment")/n()) %>%
+  distinct() %>%
+  arrange(desc(per))
+  
+n1 %>%
+  dplyr::filter(focus == "Mental health/substance abuse treatment") %>%
+  group_by(name) %>%
+  summarise(name, TOT = n()) %>%
+  distinct() %>%
+  arrange(desc(TOT)) %>%
+  head(10)
+
+n1 %>%
+  summarise(name, focus) %>%
+  dplyr::count(focus) %>%
+  ungroup()
+
+```
+In the future, I want to try some more advanced models to determine which factors from the BRFSS data may be associated with the number/concentration of MHFs and the number of days people reported "bad mental health".
+
+# Discussion 5
+
+In my data, there are some variables that are encoded as ranges (i.e. "10-49"). I would really like to be able to use these as ordered numeric variables, but I'm not sure of the best way to capture them. Once they are numeric, I can add them together to total by state, age, etc. Should I take the lowest limits? Or the upper limits? Or somewhere in between? I think the lower limits are the safest choice.
+
+From the correlation coefficient between number of facilities and percent in need, its not too bad. DC, which has virtually no facilities, ranks number 1 for states with the highest proportion of people who had at least 1 bad mental health day. The majority of states seem to have less than 500 MHF (some much less), and while a model might have found a linear relationship between these two variables, it may not accurately capture the totality of their relationship. The "need" present in each state seems to have a significant influence over where MHF are. Authorities also seem to use other factors when deciding where facilities should be built. That means that people who might need care would have to travel significant distances to the nearest MHF. I also am curious about the large amount of facilities per capita in Maine. I did some research and couldn't find a good reason why. If I solve the numeric problem I described above, I can figure out exactly how many people may be in need. I also need to do more research to see how these facilities were collected for the survey to ensure there isn't some kind of bias affecting my results.
+
+Besides these technical bits, there are quite a few more limitations to my data. First, my assessment of the state of mental health in the US is exclusively based on the number of days people reported that they had a "bad mental health day". Obviously, each person may have a different definition of what a "bad mental health day" really means. Additionally, the number of days doesn't necessarily correlate to the severity of their mental health situation during those days. In my opinion its not completely fair to say that a person with more "bad mental health" days in one month is more mentally healthy than a person with fewer "bad mental health" days but who may have been severely sick during those few days.
+
+# Conclusion 5
+
+Based on some preliminary results, mental health facilities seem to exist with some respect for the general need of nearby populations. The relationship was more prevalent than I expected, however, I am still a bit skeptical. Splitting the bad mental health days variable at +-1 day seemed to be more helpful in predicting the number of facilities. This is probably a good thing, as any mental health issues are hard to describe as "severe" based solely on how often they occur, and even one day of bad mental health may warrant treatment at a mental health facility. Additionally, the facility focus doesn't seem to have much of an effect on the outcome, however in the substance abuse category, Ohio ranks number on in the number of facilities. Since Ohio is a hotspot of the opioid epidemic, I would be interested to look into this further.
+
+
+
+________________________________________________________________________________
+
+
+
+# Executive Summary 4
+
+This week I continued doing cleaning and exploring my data. I think by now I have enough of a handle on what the data shows to start looking at the bigger picture of both datasets.
+
+# Introduction 4
+
+CW: Mental illness, suicide, depression
+
+Mental health is a subject often overlooked. It's not taught well in schools, it's not talked about, and there is a stigma around seeking help. Especially after the onset of COVID-19, global health became a top priority for health organizations like the WHO, CDC, and governments around the world. But now, as the result of over a year of isolation, death, and sacrifice, global mental health is at an all time low and deserves attention as well.
+
+In the United States:
+
+  - 40% of U.S. adults reported struggling with mental health or substance use
+  - Suicide is the second-leading cause of death among people aged 10-34
+  - The average delay between onset of mental illness symptoms and treatment is 11 years
+  
+The first step in solving this crisis is identifying the problem. Each year, the CDC conducts a survey using the Behavioral Risk Factor Surveillance System. Surveyors contacted 400,000 people in 2020 by landline or cell phone and asked questions about their general health. Another yearly survey, the National Mental Health Services Survey collects information from mental health facilities. While these surveys are not directly associated, I hope to study them independently and together to assess the situation of the available infrastructure, reporting, and outcomes regarding mental health in the United States.
+
+  - [BRFSS User Guide](https://www.cdc.gov/brfss/data_documentation/pdf/UserguideJune2013.pdf)
+  - [BRFSS Codebook](https://www.cdc.gov/brfss/annual_data/2020/pdf/codebook20_llcp-v2-508.pdf)
+  - [N-MHSS Codebook](https://www.datafiles.samhsa.gov/sites/default/files/field-uploads-protected/studies/N-MHSS-2020/N-MHSS-2020-datasets/N-MHSS-2020-DS0001/N-MHSS-2020-DS0001-info/N-MHSS-2020-DS0001-info-codebook.pdf)
+
+This project hopes to provide insight into a couple of questions:
+
+  - What is the state of mental health in the US as of 2020?
+  - How are certain states and demographic groups doing and do they have the facilities for mental health treatment?
+
+# Data Science Methods 4
+
+See [Data Science Methods 3]
+
+# Exploratory Analysis 4
+
+```{r eda 4}
+
+## brfss
+brfss %>%
+  ggplot() + geom_bar(aes(x = age)) + scale_y_continuous(labels = comma) +
+  labs(caption = "BRFSS")
+
+#health insurance
+brfss %>%
+  dplyr::filter(HLTHPLN1 %in% c(1, 2)) %>%
+  ggplot() + geom_bar(aes(x = HLTHPLN1)) + scale_y_continuous(labels = comma) +
+  scale_x_discrete(limits = c("Yes", "No")) +
+  labs(caption = "BRFSS",
+       x = "Do you have any kind of health care coverage?")
+
+#personal doctor
+brfss %>%
+  dplyr::filter(PERSDOC2 %in% c(1, 2, 3)) %>%
+  ggplot() + geom_bar(aes(x = PERSDOC2)) + scale_y_continuous(labels = comma) +
+  scale_x_discrete(limits = c("Yes","More Than One", "No")) +
+  labs(caption = "BRFSS",
+       x = "Do you have one person you think of as your personal doctor or health care provider?")
+
+#medical cost
+brfss %>%
+  dplyr::filter(MEDCOST %in% c(1, 2)) %>%
+  ggplot() + geom_bar(aes(x = MEDCOST)) + scale_y_continuous(labels = comma) +
+  scale_x_discrete(limits = c("Yes", "No")) +
+  labs(caption = "BRFSS",
+       x = "Was there a time in the past 12 months when you needed to see a doctor \nbut could not because of cost?")
+
+#checkup
+brfss %>%
+  dplyr::filter(CHECKUP1 %in% c(1, 2, 3, 4)) %>%
+  ggplot() + geom_bar(aes(x = CHECKUP1)) + scale_y_continuous(labels = comma) +
+  scale_x_discrete(limits = c("< 1 year", "< 2 years", "< 5 years", "5+ years")) +
+  labs(caption = "BRFSS",
+       x = "About how long has it been since you last visited a doctor for a routine checkup?")
+
+#checkup with age
+brfss %>%
+  dplyr::filter(CHECKUP1 %in% c(1, 2, 3, 4)) %>%
+  dplyr::summarise(
+    `time since last checkup` = factor(CHECKUP1, 
+                                       labels = c("< 1 year", "< 2 years", "< 5 years", "5+ years")), 
+    age) %>%
+  table()
+
+# marital status
+brfss %>%
+  dplyr::filter(MARITAL %in% c(1, 2, 3, 4, 5, 6)) %>%
+  ggplot() + geom_bar(aes(x = MARITAL)) + scale_y_continuous(labels = comma) +
+  scale_x_discrete(limits = c("Married", "Divorced", "Widowed", "Separated", "Never Married", "Unamrried Couple")) +
+  labs(caption = "BRFSS",
+       x = "Marital Status")
+```
+
+## Summary 4
+
+My final datasets are the National Mental Health Services Survey and the Behavioral Risk Factor Surveillance System. I selected (now less than) 135 variables that are interesting to me from both datasets and have examined them in pairs.
+
+## Data Cleaning 4
+
+I renamed and relabeled many of the variables for both datasets, using my own labelling function and just explicit labelling for the BRFSS data.
+
+## Data Visualization 4
+
+See some of [Data Visualization 3]
+
+# Correlations 4
+
+See [Correlations 2]
+
+# Modeling
+
+No new information to report here
+
+# Discussion
+
+There is a lot of data here, and I'm sure I'll continue to uncover things each time I comb through my data. I think there are some key insights after this round of analysis. 
+
+  - 1. People are people
+  There is a lot of survey data that was collected from the BRFSS, and not all of the gathered results make perfect mathematical sense. Since this is pretty raw data, we have to consider how people might act, not that there is anything we can do about it. People might exaggerate, remember incorrectly, or just lie about parts of their life. The respondents are a wide range of people who have different backgrounds and interests, and that isn't always reflected clearly in the data.
+  - 2. Mental Health Matters
+  The most affirming thing that I learned was the amount of people who struggle with mental health. More people have bad mental health days than bad physical health days. As I start exploring some demographic and region-specific comparisons this statistic may change, but the first impression is that there is a tremendous need for mental health advocacy, education, and treatment everywhere
+  - 3. The average survey participant was a 65+ married english-speaking female college graduate living in a metropolitan area who regularly receives a check-up. This doesn't quite represent the average person in the Unnited States, so its important to recognize that in any future conclusions
+
+
+________________________________________________________________________________
+
+# Executive Summary 3
+
+I continued cleaning and exploring my data. Most of the coded variables have been cleaned, decoded, and mutated to fit my needs. I will need to continue to do some EDA and maybe run some logistic regressions, but for no I will continue munging and viewing. This report, I spent more time on understanding my second dataset from the Nation Mental Health Services Survey. Within my digest.R script, I made a labelling function to properly label all my factor variables. 
+
+This dataset is all categorical variables, which makes it difficult to run some comparative analyses. In the next report, I think I can try following:
+
+  - logistic regression
+  - frequency tables
+  - some Bayesian models
+  - KModes for categorical variables
+  
+I will also make some comparative plots of the United States that shows the difference in population needs and what facilities can provide. If I have some time, I would also like to use ArcGIS to see the average distance people have to travel to reach the nearest mental health facility.
+
+# Introduction 3
+
+Same as [Introduction 2]
+
+# Data Science Methods 3
+
+I'm still focusing primarily on visualization and merging my data, so I haven't employed many data science methods other than those so far. I have been working on organizing all my data a little better: keeping track of vars as they are transformed and plotted. 
+
+# Exploratory Analysis 3 {.tabset}
+
+## Explanation of my data
+
+See [Explanation of your data set 2]
+
+## Summary 3
+
+See [Summary 2]
+
+## Data Cleaning 3
+
+This week I spent some more time working on decoding variables and selecting them from the large datasets. I was able to get most of them factorized by making a labelling function for variables with the same amount of levels. I also tried a technique of breaking the 600 variables lists into smaller related chunks and stored them of character vectors. As I was reading them I filtered out the variables I wanted. This made it a lot easier for me to comprehend, and I think its easier to see all the  variable names in a few lines than on 400+ pages of a pdf codebook to make sure I didn't miss any. I combined these two parts inside of **dplyr::mutate()** so I could select the variable I wanted with **all_of**and decode them with my custom function **basiclayer** all in one step.
+
+As I plotted the data I noticed more things I will have to clean as they become apparent. Particularly, some of the variables I decoded might need to get turned back into numeric values again. For example, a facility may offer a certain treatment, but I want to count how many facilities in a state offer that treatment, I would need to convert it back to a numeric "1". This is just a small extra step, but it might save time in the long run. Its an obvious choice for factors with 10+ levels, but for smaller variables with 4, I elected to do this because it increases the immediate readability of the data and with such a large dataset, it would be easier for me to recall what each code signifies.
+
+## Data Visualization 3
+
+I was able to create a custom theme to enhance my visualizations and focused on some more basic plots.
+
+The "Function not applicable for variable" warning is from the **basiclayer** function where it couldn't match up labels. These variables get special attention later.
+
+```{r}
+
+nmhss1 %>%
+  dplyr::filter(IPTOTAL != "logical skip") %>%
+  ggplot() +
+  geom_bar(aes(x = IPTOTAL), fill = pal[7]) +
+  labs(x = "Total number of patients receiving 24-hour hospital inpatient \nmental health treatment on April 30, 2020",
+       caption = "N-MHSS") +
+  theme(axis.text.x = element_text(angle = 10, vjust = .90))
+
+nmhss1 %>%
+  dplyr::filter(OPTOTAL != "logical skip") %>%
+  ggplot() +
+  geom_bar(aes(x = OPTOTAL), fill = pal[6]) +
+  labs(x = "Total number of clients receiving less-than-24-hour mental health treatment \n(outpatient and partial hospitalization/day treatment) during April 2020",
+       caption = "N-MHSS") +
+  theme(axis.text.x = element_text(angle = 10, vjust = .90))
+
+#### demographics
+# had some trouble releveling the factor
+
+nmhss1 %>%
+  dplyr::select(starts_with("OPAGETOT")) %>%
+  pivot_longer(cols = everything(), names_to = "var", values_to = "num") %>%
+  group_by(var) %>%
+  table() %>%
+  as.data.frame(num = relevel(num, ref = levels(nmhss1$OPAGETOT017))) %>%
+  dplyr::filter(num != "logical skip") %>%
+  distinct() %>%
+  ggplot() +
+  geom_bar(aes(x = Freq, y = num), stat = "identity") + 
+  facet_wrap(~ var, ncol = 1) +
+  theme(panel.spacing.y = unit(.05, "cm"),
+        axis.text.y = element_text(size = 8))
+
+#MHI vs TOTAL FACILITY NUMBER by state
+nmhss1 %>%
+  group_by(name)%>%
+  mutate(ysum = sum(ifelse(MHINTAKE == "yes", 1, 0)),
+         tot = n()) %>%
+  summarise(name, ysum, tot) %>%
+  distinct() %>%
+  ggplot() +
+  geom_bar(aes(x = name, y = tot), stat = "identity", fill = pal[7]) +
+  geom_bar(aes(x = name, y = ysum), stat = "identity", fill = pal[2], alpha = 0.50) +
+  theme(axis.text.x = element_text(angle = 90, size = 9)) +
+  labs(x = "State", y = "Count",
+       title = "Total Number of Facilities & Percentage That Offer MHI",
+       subtitle = "Total Number in Red,  MHI in Brown",
+       caption = "N-MHSS")
+
+# will get moved to digest.R in next report
+nmhss1 <- nmhss1 %>%
+  dplyr::mutate(
+    facilitytype = factor(facilitytype, labels = c("1" = "Psychiatric hospital",
+                                                   "2" = "Separate inpatient psychiatric unit of a general hospital",
+                                                   "3" = "Residential treatment center for children",
+                                                   "4" = "Residential treatment center for adults",
+                                                   "5" = "Other residential treatment facility",
+                                                   "6" = "Veterans Administration Medical Center (VAMC)",
+                                                   "7" = "Community Mental Health Center (CMHC)",
+                                                   "8" = "Certified Community Behavioral Health Clinic (CCBHC)",
+                                                   "9" = "Partial hospitalization/day treatment facility",
+                                                   "10" = "Outpatient MHF",
+                                                   "11" = "Multi-setting MHF",
+                                                   "12" = "Other")))
+
+nmhss1 %>%
+  ggplot() +
+  geom_bar(aes(y = facilitytype), fill = pal[7]) +
+  labs(x = "count",
+       y = "Facility Type",
+       caption = "N-MHSS")
+
+```
+
+# Variable Coorelations 3
+
+See [Variable Correlations 2]
+
+# Modeling 3
+
+No new information to report here
+
+# Discussion 3
+
+See [Discussion 2]
+
+________________________________________________________________________________
+
+
+# Excuetive Summary 2
+  
+For this report, I spent most of my time on EDA and getting to know my data
+
+  - There were 663 coded variables between both datasets
+  - I conducted a little bit of EDA on each dataset independently
+  - There was a lot to learn about how these surveys are conducted, how they collect and 
+  report what kind of information.
+  - [BRFSS User Guide](https://www.cdc.gov/brfss/data_documentation/pdf/UserguideJune2013.pdf)
+  - [BRFSS Codebook](https://www.cdc.gov/brfss/annual_data/2020/pdf/codebook20_llcp-v2-508.pdf)
+  - [N-MHSS Codebook](https://www.datafiles.samhsa.gov/sites/default/files/field-uploads-protected/studies/N-MHSS-2020/N-MHSS-2020-datasets/N-MHSS-2020-DS0001/N-MHSS-2020-DS0001-info/N-MHSS-2020-DS0001-info-codebook.pdf)
+  
+  - I will hopefully be able to join the two datasets in next report by:
+    - State
+    - Ethnicity
+    - Age
+  - And locate more variables of interest
+
+# Introduction 2
+
+CW: Mental illness, suicide, depression
+
+Mental health is a subject often overlooked. It's not taught well in schools, it's not talked about, and there is a stigma around seeking help. Especially after the onset of COVID-19, global health became a top priority for health organizations like the WHO, CDC, and governments around the world. But now, as the result of over a year of isolation, death, and sacrifice, global mental health is at an all time low and deserves attention as well.
+
+In the United States:
+
+  - 40% of U.S. adults reported struggling with mental health or substance use
+  - Suicide is the second-leading cause of death among people aged 10-34
+  - The average delay between onset of mental illness symptoms and treatment is 11 years
+  
+The first step in solving this crisis is identifying the problem. Each year, the 
+CDC conducts a survey using the Behavioral Risk Factor Surveillance System. Surveyors contacted 400,000 people in 2020 by landline or cell phone and asked questions about their general health. Another yearly survey, the National Mental Health Services Survey collects information from mental health facilities. While these surveys are not directly associated, I hope to study them independently and together to assess the situation of the available infrastructure, reporting, and outcomes regarding mental health in the United States.
+
+Right now, this project will answer a couple of questions:
+
+  - Who is getting help?
+  - Who needs help?
+
+# Additional Considerations 2 {.tabset .tabset-pills .tabset-fade}
+
+When reading through materials required for this project, I cam across a couple of things I will need to keep in mind during my analysis.
+
+## Completeness 2 {-}
+
+While the BRFSS data has many observations, many of the surveyors failed to ask or record responses for a few questions. For a few questions, this is as many as 270,000 people missing. This shouldn't be too much of a problem until I start group-wise comparisons, and then I may need to drop categories with <100 observations. Based on summary statistics, I already know that too few college students were included in the survey to include them as a part of my analysis.
+
+## Similar Variables 2 {-}
+
+In both datasets, there are a lot of variables. That's not because everyone was asked 200 questions, its because there were different surveys conducted that each had their own questions. Depending on the survey type, a lot of the same questions were asked, but they were coded as different variables for some reason. So, I'll need to figure out which ones these are and join them to make things easier. In my opinion, this is just a bad practice beacuse we already have the survey type (landline, cell-phone, over 18, etc.).
+   
+# Data Science Methods 2
+
+* To be applied (such as image processing, time-series analysis, spectral analysis etc
+* Define critical capabilities and identify packages you will draw upon
+
+Becasue the data is high-dimensional, I will need to use variable selection or dimensionality-reduction techniques if I hope to perform any ML. On that note, I will probably start with simple statistical measures like t-tests or ANOVA.
+
+# Exploratory Data Analysis 2
+
+Some things I learned from the BRFSS dataset:
+
+The month before their interview, 70% of adults had 0 days when their physical health was not good, meaning that ~30% of adults had at least 1 day when their physical health was not good.  36% of Adults had at least 1 day when their mental health was not good.
+In that same month, 
+
+## Explanation of your data set 2
+
+* How many variables?
+* What are the data classes?
+* How many levels of factors for factor variables?
+* Is your data suitable for a project analysis?
+* Write you databook, defining variables, units and structures
+
+## Summary 2
+This project will use data collected from the CDC's Behavioral Risk Factor Surveillance System (BRFSS), and the Substance Abuse & Mental Health Data Archive's National Mental Health Services Survey (N-MHSS). These two surveys are part of a robust system that allows the government and other organizations to survey the mental health of the United States by telephone or through existing mental health facilities. I intend to explore the relationship between common variables, like state, ethnicity, and age to attributes that may be associated with their mental well-being. 
+
+I am curious about the effectiveness of these survey methods (and others as I discover them), including what kinds of information they collect, and how their results may indicate shortcoming or bias on the basis of geography, demographics, or one of the other variables included in this data. 
+
+To draw conclusions about this, I will need to 
+  - research the sampling methods of these surveys
+  - identify common factors across the datasets
+  - and finally, attribute these differences to a the collection method or larger structural differences between populations that are admitted into mental health facilities and those who report difficulties with mental health.
+  
+Both of my sources have freely available data, but depending on the format of the data, I may consider using outside data including APIs to increase the precision of my analysis.
+
+So far, I have begun conducting EDA on both datasets and have identified some subject material that I will need to review about in order to ensure my work is consistent with current philosophy in the field of mental health and population statistics. Most of the variables are not very descriptive so I will need to spend a significant amount of time to contextualize a total of 663 variables. The data I have is only from 2020, so it may be possible to conclude something about the effects of COVID-19 on mental health and mental health reporting, but I don't plan on including pre-pandemic data for right now.
+
+Some questions I have:
+Will I be able to use addresses?
+Will there ever be a need for more intense statistical measures than a t-test or chi2?
+How much do the two datasets overlap?
+  - Which variables are important to keep?
+
+## Data Cleaning 2
+
+For both datasets there were a lot of variables that I didn't care about
+
+  - From the BRFSS
+    - vaccination status
+    - lung cancer screening
+    - living assistance
+    - I got rid of these variables, but kept ones that have been classically associated with mental health:
+      - Exercise
+      - Some physical health
+      - Drug use
+      - Childhood trauma
+  - From the nmhss1
+    - Hundreds of questions about treatment type.
+      - First-gen antipsychotics()
+      - Different kinds of eating disorder/multiple disorder treatment programs
+    - SOPs
+    - I kept mostly just demographic variables
+
+```{r, cleaning}
+## script to download data --->
+# source("read.R")
+
+# most of my cleaning was done in this script-->
+#suppressWarnings(source("digest.R"))
+
+paste0("Variables to identify and categorize subjects: ", toString(idvar))
+
+paste0("Variables that I want to explore: ", toString(cdchealthvars))
+```
+
+
+## Data Vizualizations 2
+
+```{r visualizations}
+
+# we shouldn't see any association between date the interview was collected and the respondent's BMI
+brfss %>%
+  ggplot() + geom_point(aes(x = date, y = X_BMI5), alpha = 0.05)
+
+brfss %>%
+  ggplot() + geom_bar(aes(x = sex), fill = c("black", "blue")) +
+  labs(x = "sex",
+       y = "count")
+
+brfss %>%
+  ggplot() + geom_bar(aes(x = edu, fill = edu)) +
+  labs(x = "education") +
+  theme(axis.text.x = element_text(angle = 15),
+        legend.position = "none") +
+  scale_fill_discrete(type = "viridis")
+
+brfss %>%
+  mutate(CHILDREN = ifelse(CHILDREN == 88, 0, CHILDREN)) %>% # 88 = 0 kids for some reason
+  dplyr::filter(CHILDREN < 30) %>% # just a few outliers with 75 kids
+  ggplot() + geom_boxplot(aes(
+    y = genhealth,
+    x = CHILDREN), alpha = 0.05) +
+  labs(x = "CHILDREN", y = "GENERAL HEALTH")
+
+brfss %>%
+  dplyr::filter(CHILDREN < 30) %>% # just a few outliers with 75 kids
+  ggplot() + geom_boxplot(aes(
+    y = genhealth,
+    x = CHILDREN), alpha = 0.05) +
+  labs(x = "CHILDREN", y = "GENERAL HEALTH")
+
+## histograms
+
+brfss %>%
+  ggplot() +
+  geom_bar(aes(x = metro)) +
+  scale_y_continuous(labels = comma)
+
+brfss %>%
+  ggplot() +
+  geom_bar(aes(x = race)) +
+  scale_y_continuous(labels = comma)
+
+p <- brfss %>% 
+  ggplot() +
+  geom_bar(aes(x = phys14d, fill = phys14d)) +
+  scale_y_continuous(limits = c(0, 300000), labels = comma) +
+  labs(x = "Phsyical Health", y = "Count") +
+  ljtheme() +
+  guides(fill = "none")
+
+m <- brfss %>%
+  ggplot() +
+  geom_bar(aes(x = ment14d, fill = ment14d)) +
+  scale_y_continuous(limits = c(0, 300000), labels = comma) +
+  labs(x = "Mental Health", y = "Count") +
+  ljtheme() +
+  guides(fill = "none")
+  
+title <- ggdraw() + 
+  draw_label(
+    "Number of Days per Month Respondants Had a \"Bad Day\"",
+    fontface = 'bold',
+    x = 0,
+    hjust = -.1,
+    color = blue
+  )
+
+plot_grid(title, plot_grid(p, m, align = "vh"), nrow = 2, rel_heights = c(0.1, 1))
+
+### by state
+extraterr <- rbind(c(66, "Guam"), c(72, "Puerto Rico"))
+
+###########################################################################
+#  nmhss1
+
+nmhss1 %>%
+  group_by(name) %>%
+  mutate(ycount = n(),
+         name = ifelse(name == "ZZ", "Other", name)) %>%
+  summarise(name, ycount) %>%
+  distinct() %>%
+  ggplot() +
+  geom_bar(aes(x = name, y = ycount), stat = "identity") +
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(x = "State Code",
+       y = "Number of Facilities That Offer \nMental Health Intake")
+```
+
+## Variable Correlations 2
+
+```{r corr}
+corframe <- brfss %>%
+  dplyr::select(where(is.numeric)) %>%
+  dplyr::select(which(colSums(is.na(.))/nrow(.) < .50)) %>% # remove cols with >50% NAs
+  cor(use = "na.or.complete")
+
+corframe %>%
+  kable()
+
+```
+  
+# Statistical Learning: Modeling \& Prediction 2
+
+* 
+* 
+
+* Types of modeling to try
+* Statistical prediction/modeling
+* Model selection
+* Cross-validation, Predictive R2
+* Interpret results
+* Challenge results
+   
+# Discussion 2
+
+* Discussion of the answers to the data science questions framed in the introduction
+  
+# Conclusions 2
+   
+# Acknowledgments 2
+
+# References
+
+https://www.cdc.gov/brfss/annual_data/annual_2020.html
+
+https://www.mentalhealthfirstaid.org/external/2020/11/10-surprising-mental-health-statistics-from-2020/#:~:text=In%20late%20June%2C%2040%25%20of,nation%20about%20%24210.5%20billion%20annually.
+

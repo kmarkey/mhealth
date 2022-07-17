@@ -76,6 +76,7 @@ temp <- tempfile()
 # large df downloadable from https://www.cdc.gov/brfss/annual_data/2020/files/LLCP2020XPT.zip
 download.file("https://www.cdc.gov/brfss/annual_data/2020/files/LLCP2020XPT.zip", temp)
 cdc <- read_xpt(temp)
+rm(temp)
 
 ### TODO,
 # filter out redundant vars
@@ -88,6 +89,7 @@ idvar <- c("X_STATE", "IDATE", "QSTLANG", "X_METSTAT",
            "X_URBSTAT", "X_IMPRACE", "X_RFHLTH",
            "X_PHYS14D", "X_MENT14D", "X_SEX", "X_AGE_G",
            "HTM4", "WTKG3", "X_BMI5", "X_EDUCAG", "X_INCOMG")
+
 cdchealthvars <- c("GENHLTH", "PHYSHLTH", "MENTHLTH", "POORHLTH", "EMPLOY1", "EXERANY2")
 
 othervars <- c("HLTHPLN1", 'PERSDOC2', "MEDCOST", "CHECKUP1", "MARITAL", "CHILDREN", "MENTHLTH",
@@ -96,9 +98,9 @@ othervars <- c("HLTHPLN1", 'PERSDOC2', "MEDCOST", "CHECKUP1", "MARITAL", "CHILDR
 # not included
 calc <- c("IDATE", "QSTLANG", "X_SEX", "X_EDUCAG", "X_URBSTAT", "X_METSTAT", "X_IMPRACE",
           "X_RFHLTH", "X_PHYS14D", "X_MENT14D", "EXERANY2", "GENHLTH", "X_AGE_G", "X_INCOMG", "EMPLOY1")
-
+names(cdc) <- sub("^_", "X_", names(cdc))
 brfss <- cdc %>%
-  dplyr::filter(IYEAR == 2020, X_STATE %!in% c("66", "72")) %>%
+  dplyr::filter(IYEAR == 2020, X_STATE != "66" & X_STATE != "72") %>%
   dplyr::select(all_of(idvar), all_of(cdchealthvars), all_of(othervars)) %>%
   dplyr::mutate(date = as.Date(IDATE, format = "%m%d%Y"),
          qstlang = factor(QSTLANG, labels = c("1" = "english", "2" = "spanish", "3" = "other")),

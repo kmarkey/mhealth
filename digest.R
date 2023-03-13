@@ -8,6 +8,8 @@ library(rio)
 library(haven)
 library(here)
 
+source("process-functions.R")
+
 here()
 
 # setwd("LocalRStudio/mhealth352")
@@ -16,15 +18,15 @@ here()
 
 #=========================== population and states =============================
 
-statekey <- tibble(state = str_to_lower(state.name), abb = state.abb, num = c(1:8, 10:51)) %>%
+statekey <- tibble(state = str_to_title(state.name), abb = state.abb, num = c(1:8, 10:51)) %>%
   
-  rows_insert(tibble(state = "district of columbia", abb = "DC", num = 9), by = "state") %>%
+  rows_insert(tibble(state = "District of Columbia", abb = "DC", num = 9), by = "state") %>%
   
   arrange(state)
 
 pop <- read_csv("./data/census2020pop.csv") %>%
     
-    dplyr::mutate(state = tolower(NAME)) %>%
+    dplyr::mutate(state = str_to_title(NAME)) %>%
     
     right_join(statekey, by = "state") %>%
     
@@ -34,137 +36,7 @@ pop <- read_csv("./data/census2020pop.csv") %>%
 
 # FNS
 
-basiclayer <- function(x, ...) {
-    if (all(levels(as.factor(x)) == c("-2", "-1", "0", "1"))) { # 4
-        
-        factor(x, labels = c("-2" = "logical skip", "-1" = NA, "0" = "no", "1" = "yes"), ordered = TRUE) 
-        
-    } else if (all(levels(as.factor(x)) == c("-1", "0", "1"))) { # 3
-        
-        factor(x, labels = c("-1" = NA, "0" = "no", "1" = "yes"), ordered = TRUE)
-        
-    } else if (all(levels(as.factor(x)) == c("0", "1"))) { # 2
-        
-        factor(x, labels = c("0" = "no", "1" = "yes"), ordered = TRUE)
-        
-    } else if (all(levels(as.factor(x)) == c("-2", "0", "1"))) { # 3 without missing
-        
-        factor(x, labels = c("-2" = "logical skip", "0" = "no", "1" = "yes"), ordered = TRUE)
-        
-    } else if (all(levels(as.factor(x)) == c("-2", "0", "1", "2", "3", "4", "5", "6", 
-                                             "7", "8", "9", "10", "11", "12"))) { # 14 level to 12
-        
-        factor(x, labels = c("-2" = "logical skip", "0" = "0", "1" = "1-10", "2" = "11-20", 
-                             "3" = "21-30", "4" = "31-40", "5" = "41-50", "6" = "51-75", 
-                             "7" = "76-100", "8" = "101-250", "9" = "251-500", 
-                             "10" = "501-1000", "11" = "1001-1500", "12" = "1500+"), ordered = TRUE)
-        
-    } else if (all(levels(as.factor(x)) == c("-2","-1", "0", "1", "2", "3", "4", "5", "6",
-                                             "7", "8", "9", "10", "11", "12"))) { # 15 level
-        
-        factor(x, labels = c("-2" = "logical skip", "-1" = NA, "0" = "0", "1" = "1-10", 
-                             "2" = "11-20", "3" = "21-30", "4" = "31-40", "5" = "41-50", 
-                             "6" = "51-75", "7" = "76-100", "8" = "101-250", "9" = "251-500", 
-                             "10" = "501-1000", "11" = "1001-1500", "12" = "1500+"), ordered = TRUE)
-      
-    } else if (all(levels(as.factor(x)) == c("-2","-1", "0", "1", "2", "3", "4", "5", "6", 
-                                             "7", "8", "9", "10", "11"))) { # 14 level to  11
-        
-        factor(x, labels = c("-2" = "logical skip", "-1" = NA, "0" = "0", "1" = "1-10", 
-                             "2" = "11-20", "3" = "21-30", "4" = "31-40", "5" = "41-50", 
-                             "6" = "51-75", "7" = "76-100", "8" = "101-250", "9" = "251-500", 
-                             "10" = "501-1000", "11" = "1001-1500"), ordered = TRUE)
-        
-    } else if (all(levels(as.factor(x)) == c("-2","-1", "0", "1", "2", "3", "4", "5", "6", 
-                                             "7", "8", "9", "10"))) { # 13 level
-        
-        factor(x, labels = c("-2" = "logical skip", "-1" = NA, "0" = "0", "1" = "1-10", 
-                             "2" = "11-20", "3" = "21-30", "4" = "31-40", "5" = "41-50", 
-                             "6" = "51-75", "7" = "76-100", "8" = "101-250", "9" = "251-500", 
-                             "10" = "501-1000"), ordered = TRUE)
-        
-    } else if (all(levels(as.factor(x)) == c("-2","-1", "0", "1", "2", "3", "4", "5", "6", 
-                                             "7"))) { # pct levels
-        
-        factor(x, labels = c("-2" = "logical skip", "-1" = NA, "0" = "0", "1" = "1-10", 
-                             "2" = "11-20", "3" = "21-30", "4" = "31-40", "5" = "41-50", 
-                             "6" = "51-75", "7" = "76-100"), ordered = TRUE)
-        
-    } else {
-        
-        cat("Function not applicable for column", deparse(substitute(x)), "\n")
-        
-        return(x)
-        
-    }
-}
-
-clean_cdc <- function(data, goodvars) {
-  
-    names(data) <- sub("^_", "X_", names(data))
-    
-    temp <- data %>%
-    
-        dplyr::filter(IYEAR == 2020, X_STATE != "66" & X_STATE != "72") %>%
-        
-        dplyr::select(all_of(goodvars)) %>%
-        
-        dplyr::mutate(date = as.Date(IDATE, format = "%m%d%Y"),
-                        qstlang = factor(QSTLANG, labels = c("1" = "english", "2" = "spanish", "3" = "other")),
-                        sex = factor(X_SEX, labels = c("1" = "male", "2" = "female")),
-                        edu = factor(X_EDUCAG, labels = c("1" = "Did not graduate High School",
-                                                          "2" = "Graduated High School",
-                                                          "3" = "Attended College or Technical School",
-                                                          "4" = "Graduated from College or Technical School",
-                                                          "9" = NA)),
-                        metro = factor(X_METSTAT, labels = c("1" = "metropolitan", "2" = "non-metropolitan")),
-                        urban = factor(X_URBSTAT, labels = c("1" = "urban", "2" = "rural")),
-                        mscode = factor(MSCODE, labels = c("1" = "Center of an MSA", "2" = "Outside city, inside county",
-                                                           "3" = "Inside suburban county", "5" = "Not in MSA")),
-                        race = factor(X_IMPRACE, labels = c("1" = "white", "2" = "black", "3" = "asian",
-                                                            "4" = "american indian", "5" = "hispanic", "6" = "other")),
-                        health = factor(X_RFHLTH, labels = c("1" = "good", "2" = "poor", "9" = NA)),
-                        phys14d = factor(X_PHYS14D, labels = c("1" = "0", "2" = "1-13", "3" = "14+", "9" = NA)),
-                        ment14d = factor(X_MENT14D, labels = c("1" = "0", "2" = "1-13", "3" = "14+", "9" = NA)),
-                        exercise = factor(EXERANY2, labels = c("1"= "yes", "2" = "no", "7" = NA, "9" = NA)),
-                        genhealth = factor(GENHLTH, labels =  c("1" = "excellent", "2" = "very good", "3" = "good",
-                                                                "4" = "fair", "5" = "poor", "7" = NA, "9" = NA)),
-                        age = factor(X_AGE_G, labels = c("1" = "18-24", "2" = "25-34", "3" = "35-44",
-                                                         "4" = "45-54", "5" = "55-64", "6" = "65+")),
-                        income = factor(X_INCOMG, labels = c("1" = "<15000", "2" = "15000-24999",
-                                                             "3" = "25000-34999", "4" = "35000-49999",
-                                                             "5" = "50000+", "9" = NA), ordered = TRUE),
-                        employed = factor(EMPLOY1, labels = c("1" = "Employed", "2" = "Self-employed",
-                                                              "3" = "Out of work 1+ years", "4" = "Out of work <1 year",
-                                                              "5" = "Homemaker", "6" = "Student", "7" = "Retired",
-                                                              "8" = "Unable to work", "9" = NA)),
-                        children = ifelse(CHILDREN == "88", 0, ifelse(as.numeric(CHILDREN) > 88, 0, as.numeric(CHILDREN))),
-                        marital = factor(MARITAL, labels = c("1" = "Married", "2" = "Divorced", "3" = "Widowed",
-                                                             "4" = "Separated", "5" = "Never Married", 
-                                                             "6" = "Unmarried couple", "9" = NA)),
-                        checkup = factor(CHECKUP1, labels = c("1" = "<1", "2" = "1-2", "3" = "2-5", "4" = "5+", 
-                                                              "7" = NA, "8" = "inf", "9" = NA)),
-                        medcost = factor(MEDCOST, labels = c("1" = "yes", "2" = "no", "7" = NA, "9" = NA)),
-                        persdoc2 = factor(PERSDOC2, labels = c("1" = "Only one", "2" = "More than one", "3" = "No",
-                                                               "7" = NA, "9" = NA)),
-                        hlthplan = factor(HLTHPLN1, labels = c("1" = "yes", "2" = "no", "7" = NA, "9" = NA))) %>% # add these vars to calc
-        
-        dplyr::select(-all_of(calc))
-    
-    brfss <- tibble(oldstate = unique(as.numeric(temp$X_STATE)), newstate = 1:51) %>%
-        
-        right_join(temp, by = c("oldstate" = "X_STATE")) %>%
-        
-        right_join(statekey, by = c("newstate" = "num")) %>%
-        
-        dplyr::select(-abb, -oldstate, -newstate) %>%
-        
-        dplyr::mutate(state = as.factor(state))
-        
-        return(brfss)
-}
-
-get_cdc <- function(fn, vars = goodvars, path = "./data/brfss.csv") {
+load_cdc <- function(fn, vars = goodvars, path = "./data/brfss.csv") {
   
     if (file.exists(path)) {
         
@@ -172,21 +44,21 @@ get_cdc <- function(fn, vars = goodvars, path = "./data/brfss.csv") {
         
     } else {
         
-        temp <- tempfile()
-        
-        download.file("https://www.cdc.gov/brfss/annual_data/2020/files/LLCP2020XPT.zip", temp)
-        
-        data <- read_xpt(temp)
-        
-        file.remove(temp)
-        
-        data <- fn(data, vars)
-        
-        write_csv(data, path)
-        
-        return(data)
-        
-        rm(temp, data)
+      temp <- tempfile()
+      
+      download.file("https://www.cdc.gov/brfss/annual_data/2020/files/LLCP2020XPT.zip", temp)
+      
+      data <- read_xpt(temp)
+      
+      file.remove(temp)
+      
+      data <- fn(data, vars)
+      
+      write_csv(data, path)
+      
+      return(data)
+      
+      rm(temp, data)
     }
 }
 
@@ -219,7 +91,7 @@ calc <- c("IDATE", "QSTLANG", "X_SEX", "X_EDUCAG", "X_URBSTAT", "X_METSTAT", "X_
 
 goodvars <- c(idvar, cdchealthvars, othervars)
 
-brfss <- get_cdc(clean_cdc, goodvars)
+brfss <- load_cdc(clean_cdc, goodvars)
 
 #============================== nmhss ==========================================
 
@@ -305,39 +177,40 @@ calc <- c("LANGPROV", "TOTADMIS", "OPLEGALTOTFOREN", "OPLEGALTOTNONFOREN", "OPLE
 nmhss <- nmhss %>%
     
     dplyr::transmute(across(all_of(c(apr2020, ndem)), basiclayer),
-                  facilitytype = factor(FACILITYTYPE, labels = c("1" = "Psychiatric hospital",
-                                                                 "2" = "Separate inpatient psychiatric unit of a general hospital",
-                                                                 "3" = "Residential treatment center for children",
-                                                                 "4" = "Residential treatment center for adults",
-                                                                 "5" = "Other residential treatment facility",
-                                                                 "6" = "Veterans Administration Medical Center (VAMC)",
-                                                                 "7" = "Community Mental Health Center (CMHC)",
-                                                                 "8" = "Certified Community Behavioral Health Clinic (CCBHC)",
-                                                                 "9" = "Partial hospitalization/day treatment facility",
-                                                                 "10" = "Outpatient MHF",
-                                                                 "11" = "Multi-setting MHF",
-                                                                 "12" = "Other")),
-                  focus = factor(FOCUS, labels = c("1" = "Mental health treatment",
-                                                   "3" = "Mental health/substance abuse treatment",
-                                                   "4" = "General health care",
-                                                   "5" = "Other")),
-                  ownership = factor(OWNERSHP, labels = c("1" = "Private for-profit organization",
-                                                          "2" = "Private non-profit organization",
-                                                          "3" = "Public agency or department")),
-                  operator = factor(PUBLICAGENCY, labels = c("-2" = "logical skip",
-                                                             "1" = "State mental health authority (SMHA)",
-                                                             "2" = "Other state government agency or department",
-                                                             "3" = "Regional authority orgovernment",
-                                                             "4" = "Tribal government",
-                                                             "5" = "Indian Health Service",
-                                                             "6" = "Department of Veterans Affairs",
-                                                             "7" = "Other")),
-                  facnum = factor(FACNUM, labels = c("-2" = "1",
-                                                     "1" = "2-5",
-                                                     "2" = "6-10",
-                                                     "3" = "11-30",
-                                                     "4" = "30+"))) %>%
-    
+                     id = CASEID,
+                     facilitytype = factor(FACILITYTYPE, labels = c("1" = "Psychiatric hospital",
+                                                                   "2" = "Separate inpatient psychiatric unit of a general hospital",
+                                                                   "3" = "Residential treatment center for children",
+                                                                   "4" = "Residential treatment center for adults",
+                                                                   "5" = "Other residential treatment facility",
+                                                                   "6" = "Veterans Administration Medical Center (VAMC)",
+                                                                   "7" = "Community Mental Health Center (CMHC)",
+                                                                   "8" = "Certified Community Behavioral Health Clinic (CCBHC)",
+                                                                   "9" = "Partial hospitalization/day treatment facility",
+                                                                   "10" = "Outpatient MHF",
+                                                                   "11" = "Multi-setting MHF",
+                                                                   "12" = "Other")),
+                    focus = factor(FOCUS, labels = c("1" = "Mental health treatment",
+                                                     "3" = "Mental health/substance abuse treatment",
+                                                     "4" = "General health care",
+                                                     "5" = "Other")),
+                    ownership = factor(OWNERSHP, labels = c("1" = "Private for-profit organization",
+                                                            "2" = "Private non-profit organization",
+                                                            "3" = "Public agency or department")),
+                    operator = factor(PUBLICAGENCY, labels = c("-2" = "logical skip",
+                                                               "1" = "State mental health authority (SMHA)",
+                                                               "2" = "Other state government agency or department",
+                                                               "3" = "Regional authority orgovernment",
+                                                               "4" = "Tribal government",
+                                                               "5" = "Indian Health Service",
+                                                               "6" = "Department of Veterans Affairs",
+                                                               "7" = "Other")),
+                    facnum = factor(FACNUM, labels = c("-2" = "1",
+                                                       "1" = "2-5",
+                                                       "2" = "6-10",
+                                                       "3" = "11-30",
+                                                       "4" = "30+"))) %>%
+      
     right_join(statekey, by = c("LST" = "abb")) %>%
     
     dplyr::select(-LST, -num)

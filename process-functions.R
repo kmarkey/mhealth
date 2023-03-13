@@ -65,8 +65,6 @@ clean_cdc <- function(data, goodvars) {
   
   temp <- data %>%
     
-    dplyr::filter(IYEAR == 2020, X_STATE != "66" & X_STATE != "72") %>%
-    
     dplyr::select(all_of(goodvars)) %>%
     
     dplyr::mutate(date = as.Date(IDATE, format = "%m%d%Y"),
@@ -79,6 +77,8 @@ clean_cdc <- function(data, goodvars) {
                                                     "9" = NA)),
                   metro = factor(X_METSTAT, labels = c("1" = "metropolitan", "2" = "non-metropolitan")),
                   urban = factor(X_URBSTAT, labels = c("1" = "urban", "2" = "rural")),
+                  mscode = factor(MSCODE, labels = c("1" = "Center of an MSA", "2" = "Outside city, inside county",
+                                                     "3" = "Inside suburban county", "5" = "Not in MSA")),
                   race = factor(X_IMPRACE, labels = c("1" = "white", "2" = "black", "3" = "asian",
                                                       "4" = "american indian", "5" = "hispanic", "6" = "other")),
                   health = factor(X_RFHLTH, labels = c("1" = "good", "2" = "poor", "9" = NA)),
@@ -95,11 +95,21 @@ clean_cdc <- function(data, goodvars) {
                   employed = factor(EMPLOY1, labels = c("1" = "Employed", "2" = "Self-employed",
                                                         "3" = "Out of work 1+ years", "4" = "Out of work <1 year",
                                                         "5" = "Homemaker", "6" = "Student", "7" = "Retired",
-                                                        "8" = "Unable to work", "9" = NA))) %>% # add these vars to calc
+                                                        "8" = "Unable to work", "9" = NA)),
+                  children = ifelse(CHILDREN == "88", 0, ifelse(as.numeric(CHILDREN) > 88, 0, as.numeric(CHILDREN))),
+                  marital = factor(MARITAL, labels = c("1" = "Married", "2" = "Divorced", "3" = "Widowed",
+                                                       "4" = "Separated", "5" = "Never Married", 
+                                                       "6" = "Unmarried couple", "9" = NA)),
+                  checkup = factor(CHECKUP1, labels = c("1" = "<1", "2" = "1-2", "3" = "2-5", "4" = "5+", 
+                                                        "7" = NA, "8" = "inf", "9" = NA)),
+                  medcost = factor(MEDCOST, labels = c("1" = "yes", "2" = "no", "7" = NA, "9" = NA)),
+                  persdoc2 = factor(PERSDOC2, labels = c("1" = "Only one", "2" = "More than one", "3" = "No",
+                                                         "7" = NA, "9" = NA)),
+                  hlthplan = factor(HLTHPLN1, labels = c("1" = "yes", "2" = "no", "7" = NA, "9" = NA))) %>% # add these vars to calc
     
     dplyr::select(-all_of(calc))
   
-  brfss <- tibble(oldstate = unique(as.numeric(temp$X_STATE)), newstate = 1:51) %>%
+  brfss <- tibble(oldstate = unique(as.numeric(temp$X_STATE)), newstate = 1:53) %>%
     
     right_join(temp, by = c("oldstate" = "X_STATE")) %>%
     
@@ -107,31 +117,7 @@ clean_cdc <- function(data, goodvars) {
     
     dplyr::select(-abb, -oldstate, -newstate) %>%
     
-    dplyr::mutate(name = as.factor(name))
+    dplyr::mutate(state = as.factor(state))
   
   return(brfss)
-}
-
-get_cdc <- function(fn, vars = goodvars, path = "./data/brfss.csv") {
-    
-    if (file.exists(path)) {
-        
-        data <- read_csv(path)
-        
-    } else {
-        
-        temp <- tempfile()
-    
-        download.file("https://www.cdc.gov/brfss/annual_data/2020/files/LLCP2020XPT.zip", temp)
-        
-        data <- read_xpt(temp)
-        
-        file.remove(temp)
-        
-        data <- 
-        
-        return(fn(data, vars))
-        
-        rm(temp, data)
-    }
 }

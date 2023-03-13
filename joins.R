@@ -11,12 +11,12 @@
 
 # age, state, and race
 
-require(dplyr)
-require(forcats)
-require(readxl)
-require(tidyr)
-require(purrr)
-require(rlang)
+# require(dplyr)
+# require(forcats)
+# require(readxl)
+# require(tidyr)
+# require(purrr)
+# require(rlang)
 
 ## important vignette https://dplyr.tidyverse.org/articles/programming.html
 ## http://jonthegeek.com/2018/06/04/writing-custom-tidyverse-functions/
@@ -35,9 +35,13 @@ drillb <- function(...) {
         
         dplyr::group_by(!!!quos, state) %>%
         
-        dplyr::count(wt = X_LLCPWT, .drop = FALSE, name = "count")
+        dplyr::count(wt = X_LLCPWT, .drop = FALSE, name = "count") %>%
+        
+        group_by(state) %>%
+        
+        mutate(statecount = sum(count),
+               state = str_to_title(state))
 }
-
 
 drilln <- function(...) {
   
@@ -49,10 +53,14 @@ drilln <- function(...) {
         
         dplyr::group_by(!!!quos, state) %>%
         
-        dplyr::count(.drop = FALSE, name = "count")
+        dplyr::count(.drop = FALSE, name = "count") %>%
+    
+        group_by(state) %>%
+      
+        mutate(statecount = sum(count),
+               state = str_to_title(state))
     }
 
-# 
 # b1 <- brfss %>%
 #   dplyr::select(-date, -PHYSHLTH, -MENTHLTH, -POORHLTH, -health, -HTM4, -WTKG3) %>%
 #   dplyr::mutate(age = fct_collapse(age, "18-64" = c("18-24", "25-34", "35-44", "45-54", "55-64"), 

@@ -1394,9 +1394,7 @@ There is a lot of data here, and I'm sure I'll continue to uncover things each t
   There is a lot of survey data that was collected from the BRFSS, and not all of the gathered results make perfect mathematical sense. Since this is pretty raw data, we have to consider how people might act, not that there is anything we can do about it. People might exaggerate, remember incorrectly, or just lie about parts of their life. The respondents are a wide range of people who have different backgrounds and interests, and that isn't always reflected clearly in the data.
   - 2. Mental Health Matters
   The most affirming thing that I learned was the amount of people who struggle with mental health. More people have bad mental health days than bad physical health days. As I start exploring some demographic and region-specific comparisons this statistic may change, but the first impression is that there is a tremendous need for mental health advocacy, education, and treatment everywhere
-  - 3. The average survey participant was a 65+ married english-speaking female college graduate living in a metropolitan area who regularly receives a check-up. This doesn't quite represent the average person in the Unnited States, so its important to recognize that in any future conclusions
-
-
+  - 3. The average survey participant was a 65+ married english-speaking female college graduate living in a metropolitan area who regularly receives a check-up. This doesn't quite represent the average person in the United States, so its important to recognize that in any future conclusions
 ________________________________________________________________________________
 
 # Executive Summary 3

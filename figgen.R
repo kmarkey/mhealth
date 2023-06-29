@@ -7,7 +7,9 @@ library(cowplot)
 library(ggrepel)
 library(stringr)
 library(plotly)
+library(here)
 
+setwd("~/LocalRStudio/mhealth/")
 psave <- function(path, save = TRUE) {
     
     if (save == TRUE) {
@@ -259,10 +261,10 @@ p <- data %>%
                               y = y, 
                               group = group, 
                               fill = per, 
-                              text = paste0(round(per * 100, 2), "%\nn = ", comma(n))), 
+                              text = paste0(round(per * 100, 2), "%")), 
                           color = "black", 
                           linewidth = 0.2) +
-    
+  
   coord_sf() +
   
   scale_fill_fermenter(palette = 3, 
@@ -271,7 +273,7 @@ p <- data %>%
                        labels = c("10%", "12%", "14%", "16%")
                        ) +
   
-  labs(title = "Weighted Percentage of Residents Who Had\n14+ Bad Mental Health Days",
+  labs(title = "Weighted Percentage of Residents Who Had\n14+ Bad Mental Health Days per Month",
        caption = "BRFSS 2020\ncdc.gov",
        fill = "") +
 
@@ -283,8 +285,6 @@ p <- data %>%
         panel.background = element_blank(), 
         panel.grid = element_line(color = "transparent"), 
         plot.background = element_rect(color = "transparent"))
-
-p
 
 ggplotly(p, tooltip = "text")
 
@@ -321,7 +321,7 @@ p <- data %>%
   scale_fill_fermenter(palette = 8, guide = "colorbar",
                        labels = c("30%", "35%", "40%", "45%"), direction = 1) +
 
-  labs(fill = "Percent", title = "Weighted Percentage of Residents Who Had \nAt Least 1 Bad Mental Health Day",
+  labs(fill = "Percent", title = "Weighted Percentage of Residents Who Had \nAt Least 1 Bad Mental Health Day per Month",
        caption = "BRFSS") +
   
   theme(legend.position = 'right',
@@ -333,8 +333,6 @@ p <- data %>%
         panel.background = element_blank(), 
         panel.grid = element_line(color = "transparent"), 
         plot.background = element_rect(color = "transparent"))
-
-p
 
 ggplotly(p, tooltip = "text")
 
@@ -387,7 +385,6 @@ psave("./figs/plot9.png")
 
 htmlwidgets::saveWidget(last_plot(), "./figs/plot9.html")
 
-pop
 #### Number of MHF per cap
 p <- drilln() %>%
   left_join(pop, by = c("state")) %>%
@@ -430,15 +427,13 @@ p <- drilln() %>%
     plot.background = element_rect(color = "transparent")
   )
 
-p
-
 ggplotly(p, tooltip = "text")
 
 psave("./figs/plot10.png")
 
 htmlwidgets::saveWidget(last_plot(), "./figs/plot10.html")
 
-### Mental health treatment specialty correlation
+### Mental health treatment specialty correlation ##############################
 #### per capita?
 
 pcor <- drilln() %>%
@@ -480,7 +475,8 @@ ggplot(data, aes(x = pcap, y = per)) +
        x = "Number of MHF per capita", 
        title = "Mental Health Need and Availability",
        subtitle = "All Facilities") +
-  geom_smooth(formula = y ~ x, method = "lm", lty = 2, se = FALSE)
+  geom_smooth(formula = y ~ x, method = "lm", lty = 2, se = FALSE) +
+  theme_bw()
 
 psave("./figs/plot13.png")
 
@@ -512,14 +508,15 @@ p <- drilln(facilitytype) %>%
        subtitle = "Number of facilities, by state and type, proportional to population",
        y = "Facilities per 100,000 residents") +
     
-    annotate("segment", x = 1, y = 15, xend = 31, yend = 15,
-           arrow = arrow(type = "closed", length = unit(0.02, "npc"))) +
-    
+    geom_segment(aes(x = 1, y = 15, xend = 31, yend = 15), 
+                 arrow = arrow(type = "closed", length = unit(0.02, "npc"))) +
+
     annotate("text", x = 24, y = 14, label = "More residents", size = 3.3, hjust = 0)
 
 p
 
 ggplotly(p, tooltip = "text")
+
 psave("./figs/plot15.png")
 
 # larger states have less facilities per person. They might have larger facilities (more beds, staff), but this also means

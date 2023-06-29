@@ -12,7 +12,7 @@ source("process-functions.R")
 
 here()
 
-# setwd("LocalRStudio/mhealth352")
+# setwd("~/LocalRStudio/mhealth352")
 
 `%!in%` <- Negate(`%in%`)
 
@@ -41,6 +41,8 @@ load_cdc <- function(fn, vars = goodvars, path = "./data/brfss.csv") {
     if (file.exists(path)) {
         
         data <- read_csv(path)
+        
+        return(data)
         
     } else {
         
@@ -73,12 +75,12 @@ load_cdc <- function(fn, vars = goodvars, path = "./data/brfss.csv") {
 
 #  important vars
 
-idvar <- c("X_STATE", "IDATE", "QSTLANG", "X_METSTAT",
+idvars <- c("X_STATE", "IDATE", "QSTLANG", "X_METSTAT",
            "X_URBSTAT", "X_IMPRACE", "X_RFHLTH",
            "X_PHYS14D", "X_MENT14D", "X_SEX", "X_AGE_G",
            "HTM4", "WTKG3", "X_BMI5", "X_EDUCAG", "X_INCOMG", "X_LLCPWT")
 
-cdchealthvars <- c("GENHLTH", "PHYSHLTH", "MENTHLTH", "POORHLTH", "EMPLOY1", "EXERANY2")
+cdchealthvars <- c("GENHLTH", "PHYSHLTH", "MENTHLTH", "POORHLTH", "EMPLOY1", "EXERANY2", "X_RFBING5", "ACEDRUGS", "ACEDEPRS")
 
 othervars <- c("HLTHPLN1", 'PERSDOC2', "MEDCOST", "CHECKUP1", "MARITAL", "CHILDREN", "MENTHLTH",
                "PHYSHLTH", "GENHLTH", "MSCODE")
@@ -89,9 +91,10 @@ calc <- c("IDATE", "QSTLANG", "X_SEX", "X_EDUCAG", "X_URBSTAT", "X_METSTAT", "X_
           "X_RFHLTH", "X_PHYS14D", "X_MENT14D", "EXERANY2", "GENHLTH", "X_AGE_G", "X_INCOMG", "EMPLOY1", 
           "CHILDREN", "MARITAL", "CHECKUP1", "MEDCOST", "PERSDOC2", "HLTHPLN1", "MSCODE")
 
-goodvars <- c(idvar, cdchealthvars, othervars)
+goodvars <- c(idvars, cdchealthvars, othervars)
 
-brfss <- load_cdc(clean_cdc, goodvars)
+brfss <- load_cdc(clean_cdc, # cleaning function
+                  goodvars) # cols to keep
 
 #============================== nmhss ==========================================
 
@@ -106,7 +109,10 @@ nmhss <- read_csv("./data/nmhss-puf-2020-csv.csv")
 ndem <- c("LST", "MHINTAKE", "MHDIAGEVAL", "TREATMT", "FACILITYTYPE", "FOCUS", "OWNERSHP", 
          "PUBLICAGENCY", "RELIG", "NOTREAT", "ANTIPSYCH", "MHCASEMGMT", "MHCHRONIC", "PRIMARYCARE",
          "DIETEXERCOUNSEL", "MHEDUCATION", "MHNOSVCS", "SRVC31", "NOSPECGRP", "LANG", "ADOPTSECLUSION",
-         "PAYASST", "LICENMH", "OTHFAC", "FACNUM", "IPSERV", "IPTOTAL")
+         # cost
+         "PAYASST", "REVCHK1", "REVCHK2", "REVCHK5", "REVCHK8", "REVCHK10", "FUNDSMHA", "FUNDSTATEWELFARE", "FUNDOTHSTATE", "FUNDLOCALGOV", "FUNDFEDGRANT", "FUNDPRIVCOMM",
+         
+         "LICENMH", "OTHFAC", "FACNUM", "IPSERV", "IPTOTAL")
 
 # Taken in only April 2020
 

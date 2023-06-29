@@ -61,12 +61,14 @@ basiclayer <- function(x, ...) {
 
 clean_cdc <- function(data, goodvars) {
   
+  #  make data resemble data dict
   names(data) <- sub("^_", "X_", names(data))
   
   temp <- data %>%
     
     dplyr::select(all_of(goodvars)) %>%
     
+    # for each var, label and as factor
     dplyr::mutate(date = as.Date(IDATE, format = "%m%d%Y"),
                   qstlang = factor(QSTLANG, labels = c("1" = "english", "2" = "spanish", "3" = "other")),
                   sex = factor(X_SEX, labels = c("1" = "male", "2" = "female")),

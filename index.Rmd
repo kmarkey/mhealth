@@ -1,0 +1,881 @@
+---
+title: The State of Mental Illness
+subtitle:  A survey of mental health and treatment in the U.S.
+categories: ["R", "mental health", "mental illness", "United States"]
+tags: ["BRFSS", "mental health", "health", "data", "R", "tidyverse", "dplyr", "ggplot", "Rstudio", "behavioral health", "mental health facilities", "mental illness", "state", "United states", "NMHSS"]
+
+author: Keaton Markey
+date: 2023-05-23
+menubar_toc: true
+toc_title: Contents
+hero_height: is-fullwidth
+editor_options:
+  markdown: 
+    wrap: 60
+
+output:
+  github_document:
+    toc: false
+    number_sections: false
+    preserve_yaml: true
+    
+always_allow_html: true
+warning: false
+echo: false
+---
+
+# Introduction
+
+In the past couple of years, during a global period of isolation,
+suffering, and uncertainty, mental health has increasingly become a
+concern for everyone. Poor mental health represents a host of massive
+issues in the United States:
+
+-   Suicide, the most severe outcome of mental health challenges, is the
+    second-leading cause of death among people aged 10-34. The
+    importance of mental health cannot be overstated when it comes to
+    saving lives.
+
+-   It is extremely difficult to be treated for mental health
+    challenges. The average delay between onset of mental illness
+    symptoms and treatment is 11 years.
+
+-   In the US, more adults reported struggling with mental health or
+    substance abuse than physical health -- around 40% in 2020. There is
+    a tremendous need for mental health care, and to solve this crisis
+    we must learn about, advocate for, and fund treatment.
+
+This project was started for a data science course I took in 2022. Using
+two national surveys, I contrast the reported rates of poor mental
+health in each state with the accessibility of general facility-based
+mental health care. Further, based on local indicators of poor mental
+health and substance abuse, I rank each state for its ability to serve
+the specific mental health needs of it's population.
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(haven)
+library(cowplot)
+library(sf)
+library(usmap)
+library(here)
+library(plotly)
+library(scales)
+library(RColorBrewer)
+
+# options
+# no summarise info
+options(tidyverse.quiet = TRUE)
+options(dplyr.summarise.inform = FALSE)
+# no warnings
+options(warn=-1)
+
+# source scripts
+source("functions.R")
+source("digest.R")
+
+brfss <- read_csv("data/brfss.csv")
+
+brfss <- left_join(brfss, statekey, by = c("X_STATE" = "fips"))
+```
+
+# BRFSS
+
+## Physical and Mental Health
+
+**The Behavioral Risk Factor Surveillance System (BRFSS)** is a survey
+conducted yearly by the CDC which contacts hundreds of thousands of
+residents across the U.S. for basic information on health-related
+behavior. The survey is weighted by demographic as to account for any
+sampling bias. Upwards of 200 data points are collected from each
+participant and a few are related to mental health and its co-morbidities, including substance
+abuse.
+
+Each participant was asked to report the number of days they had a "bad day" with respect to their physical and mental health:
+
+> "Now thinking about your physical health, which includes physical illness and injury, for how many days during the past 30 days was your physical health not good?"
+
+> "Now thinking about your mental health, which includes stress, depression, and problems with emotions, for how many days during the past 30 days was your mental health not good?"
+
+Let's look at he number of days per month that respondents had bad physical or mental health days.
+
+```{r chunk1}
+p <- drillb(phys14d) %>%
+  group_by(phys14d) %>%
+  reframe(phys14d, tot = sum(count)) %>%
+  unique() %>%
+  ggplot() +
+  geom_bar(aes(x = phys14d, y = tot/1000000), stat = "identity", fill = "#e76f51", color = "#2B2D42") +
+  scale_y_continuous(limits = c(0, 200), labels = comma) +
+  scale_x_discrete(position = "top") +
+  labs(x = "Phsyical Health", y = "Frequency (in millions)") +
+  theme_classic() +
+  theme(axis.title.x = element_text(size = 14, face = "bold")) +
+  guides(fill = "none")
+
+m <- drillb(ment14d) %>%
+  group_by(ment14d) %>%
+  reframe(ment14d, tot = sum(count)) %>%
+  unique() %>%
+  ggplot() +
+  geom_bar(aes(x = ment14d, y = tot/1000000), stat = "identity", fill = "#588157", color = "#2B2D42") +
+  scale_y_continuous(limits = c(0, 200), labels = comma) +
+  scale_x_discrete(position = "top") +
+  labs(x = "Mental Health") +
+  theme_classic() +
+  theme(axis.title.y = element_blank(),
+        axis.title.x = element_text(size = 14, face = "bold")) +
+  guides(fill = "none")
+
+
+plot_grid(p, m, align = "vh", nrow = 1)
+
+```
+
+In total, more respondents had bad mental health days than bad physical health days.
+
+The responses to this question are highly subjective to the respondent's own idea of what constitutes a "bad health day".   the population with "bad mental
+health" is defined as all respondents who had at least 14 (14+) bad
+mental health day per month.
+
+## Drug Use
+
+Drug use, and particularly drug use disorders, are highly associated with mental
+illness.
+[source](https://nida.nih.gov/publications/research-reports/common-comorbidities-substance-use-disorders/part-1-connection-between-substance-use-disorders-mental-illness). The survey asks a couple questions regarding drug use.
+
+### Binge Drinking
+
+Participants were asked questions about alcohol consumption.
+
+>   "Considering all types of alcoholic beverages, how many times during the past 30 days did you have 5 or more drinks for men or 4 or more drinks for women on an occasion?"
+
+Those with at least one occurrence are considered to have participated
+in binge drinking in the past month.
+
+
+```{r}
+  # helper fun
+# range01 <- function(x){(x-min(x))/(max(x)-min(x))}
+# 
+#   # creating scale breaks and color palette
+# all_scaled_breaks <- range01(c(min(data[['per']], na.rm = TRUE), c(0.12, 0.14, 0.16, 0.18, 0.20), max(data[['per']], na.rm = TRUE)))
+# 
+# z_colors <- brewer.pal(length(all_scaled_breaks) - 1, "Oranges")
+# 
+#   # list of z breaks
+#   z_list <- embed(all_scaled_breaks, 2)[, 2:1] |>
+#     as.vector() |>
+#     sort() %>%
+#     data.frame(z = .)
+# 
+#   # final color scale df
+#   colorScale <- bind_cols(z_list, cols = rep(z_colors, each = 2))
+# 
+
+```
+
+```{r chunk2}
+
+us_states <- us_map(regions = "state")
+
+data <- drillb(X_RFBING5) %>%
+  
+  group_by(state) %>%
+  
+  reframe(per = `count`/sum(`count`), X_RFBING5, n = sum(`count`)) %>%
+  
+  dplyr::filter(X_RFBING5 == "2") %>%
+  
+  right_join(us_states, by = c("state" = "full"))
+
+plotly_chloropleth(data = data, 
+                   z = "per", 
+                   colors = "Oranges", 
+                   tick_breaks = c(0.12, 0.14, 0.16, 0.18, 0.20), 
+                   symbol = "%") %>%
+  
+    plotly_anno(text = "Data source: BRFSS 2020")
+```
+
+
+Of those that drink, this map shows the average number of drinks per month, compiled from the average number of drinks per occasion:
+
+>   "During the past 30 days, on the days when you drank, about how many drinks did you drink on the average?"
+
+```{r}
+
+# avg number of drinks per person
+data <- drillb(AVEDRNK3) %>%
+  
+  dplyr::filter(AVEDRNK3 <= 76) %>%
+  
+  group_by(state) %>%
+  
+  reframe(total = `count` * AVEDRNK3, avg = sum(total) / statecount) %>%
+  
+  dplyr::select(-total) %>%
+  
+  distinct() %>%
+  
+  right_join(us_states, by = c("state" = "full"))
+
+plotly_chloropleth(data = data, 
+                   z = "avg", 
+                   colors = "Oranges", 
+                   tick_breaks = c(0.80, 1.00, 1.20, 1.40)) %>%
+    plotly_anno(text = "Data source: BRFSS 2020")
+
+```
+
+Many of the central northern states lead this category.
+
+### Smoking
+
+> "Do you now smoke cigarettes every day, some days, or not at all?
+
+The following plot shows the percentage of people that smoke.
+
+```{r}
+data <- drillb(SMOKDAY2) %>%
+  dplyr::filter(SMOKDAY2 == 1 | SMOKDAY2 == 2) %>%
+  group_by(state) %>%
+  dplyr::summarise(per = sum(count) / max(statecount), statecount = max(statecount)) %>%
+  right_join(us_states, by = c("state" = "full"))
+
+plotly_chloropleth(data = data, z = "per", title = "", colors = "Oranges", tick_breaks = c(0.10, 0.14, 0.18), symbol = "%") %>%
+    plotly_anno(text = "Data source: BRFSS 2020")
+
+```
+
+
+The information available about drug use only fills in part of the picture of substance abuse that would be treated at Mental Health Facilities (MHFs).
+
+However, looking at these substances benefits us in two ways:
+
+-   First, we don't have to worry about any interference between the observed rates of drug use and the prescription of these drugs by MHFs. MHFs are not known to prescribe alcohol, tobacco, but do prescribe benzodiazepenes (Xanax, Vicodin) and amphetamines (Adderall) that result in higher rates of substance abuse.
+
+-   Second, when the government collects data about any kind of illegal activity, it introduces response bias that may not yield accurate measures how many people participate in the illegal activity. The survey skirts around this by asking some questions about people the respondents live with **(See Figure Appendix)**
+
+## Healthcare
+
+The cost of treatment is a huge barrier to many people seeking care. For all health-related visits, participants were asked:
+
+> "Was there a time in the past 12 months when you needed to see a doctor but could not because of cost?"
+
+```{r}
+
+data <- drillb(medcost) %>%
+  filter(medcost == "yes") %>%
+  group_by(state) %>%
+  dplyr::mutate(per = sum(count) / statecount) %>%
+  right_join(us_states, by = c("state" = "full"))
+
+plotly_chloropleth(data = data, z = "per", title = "", colors = "Oranges", tick_breaks = c(0.08, 0.10, 0.12, 0.14), symbol = "%") %>%
+    plotly_anno(text = "Data source: BRFSS 2020")
+
+```
+
+Treatment is especially difficult to afford if a patient doesn't have any kind of healthcare.
+
+> "Do you have any kind of health care coverage, including health insurance, prepaid plans such as HMOs, or
+government plans such as Medicare, or Indian Health Service?"
+
+```{r}
+
+data <- drillb(hlthplan)  %>%
+  filter(hlthplan == "no") %>%
+  group_by(state) %>%
+  dplyr::mutate(per = sum(count) / statecount) %>%
+  right_join(us_states, by = c("state" = "full")) 
+
+plotly_chloropleth(data = data, z = "per", title = "Without any health care coverage", colors = "Oranges", tick_breaks = c(0.08, 0.12, 0.16, 0.20), symbol = "%") %>%
+    plotly_anno(text = "Data source: BRFSS 2020")
+```
+
+
+Texas and some other southern states stand out here.
+
+# NMHSS {.tabset .tabset-pills}
+
+**The National Mental Health Services Survey (NMHSS)** is a survey of
+12,197 Mental Health Facilities (MHFs) across the United States to collect
+information about patient demographics, treatment options, practices,
+and funding. This survey aims to be a complete list of all operating
+mental health treatment facilities within the U.S, including general
+hospitals with a specialized psychiatric unit, residential treatment
+centers, and community behavioral health clinics. For a more complete
+overview of this survey, consult the Data Section of the [References](#references).
+
+We will use this survey to get some information about: 
+
+-   the kinds of facilities that exist in each state
+-   the types of treatment options they offer and thus, what kind of population they serve
+-   the affordability of those treatments
+-   and other aspects that might hinder access and affordability of care.
+
+Lets begin by looking at where these facilities are located. While we don't have access to the precise location, we do know the state in which the facility operates.
+
+```{r chunk5}
+
+data <- drilln() %>%
+  
+  right_join(us_states, by = c("state" = "full"))
+  
+plotly_chloropleth(data = data, z = "count", colors = "Blues", tick_breaks = c(200, 400, 600, 800), symbol = "", digits = 0) %>%
+    plotly_anno(text = "Data source: NMHSS 2020")
+
+```
+
+As we should expect, California and New York have the most facilities by
+a substantial margin.
+
+If we calculate the number of facilities on a per-capita basis according to the 2020 Census, the map looks different.
+
+```{r chunk6}
+data <- drilln() %>%
+  left_join(pop, by = c("state")) %>%
+  dplyr::mutate(per = count / pop * 100000) %>%
+  
+  right_join(us_states, by = c("state" = "full"))
+
+plotly_chloropleth(data = data, z = "per", colors = "Blues", tick_breaks = c(3, 6, 9, 12), symbol = "", digits = 0) %>%
+    plotly_anno(text = "Data source: NMHSS 2020")
+
+```
+
+Due to other factors that may compound with each state's population, its a good idea to keep the population in consideration.
+
+In addition to the number facilities per capita, there are factors that might affect accessibility of mental health care.
+
+For example, a state may have a sufficient number of facilities, but:
+
+-   There are no facilities that provide treatment specialized to the
+    individual's needs
+
+-   The facility still uses outdated or harsh practices
+    
+-   The facility cannot offer treatment to that individual for legal reasons
+
+-   All facilities are full
+
+-   All facilities are too far away from the individual
+
+Even if there is a facility nearby with available rooms and specialized
+treatment that satisfies all of the individual's other needs, **an
+individual may still forego treatment because they cannot afford the financial cost.** There are many barriers to treatment that aren't covered in this analysis
+
+Let's learn a little bit more about these facilities in each state.
+
+## Facility Type
+
+The NMHSS receives data from many different kinds of facilities. Each
+facility specializes in a certain type of care, which has been
+classified into 12 types by the survey, and simplified into 7 similar
+types in the figure below.
+
+```{r chunk7}
+p <- drilln(facilitytype) %>%
+  
+  dplyr::mutate(
+    fac_type = case_when(
+      facilitytype == "Psychiatric hospital" ~ "Psychiatric Ward",
+      facilitytype == "Separate inpatient psychiatric unit of a general hospital" ~ "Psychiatric Ward",
+      facilitytype == "Residential treatment center for children" ~ "Residential Center",
+      facilitytype == "Residential treatment center for adults" ~ "Residential Center",
+      facilitytype == "Other residential treatment facility" ~ "Residential Center",
+      facilitytype == "Veterans Administration Medical Center (VAMC)" ~ "Veteran's Center",
+      facilitytype == "Community Mental Health Center (CMHC)" ~ "Community Center",
+      facilitytype == "Certified Community Behavioral Health Clinic (CCBHC)" ~ "Community Center",
+      facilitytype == "Partial hospitalization/day treatment facility" ~ "Emergency Treatment",
+      facilitytype == "Outpatient MHF" ~ "Emergency Treatment",
+      facilitytype == "Multi-setting MHF" ~ "Multi-setting MHF",
+      facilitytype == "Other" ~ "Other"
+    )
+  ) %>%
+  
+  inner_join(pop, by = "state") %>%
+  
+  ggplot() + geom_bar(
+    aes(
+      x = reorder(str_to_title(state), pop),
+      y = count / pop * 100000,
+      fill = fac_type,
+      text = paste0(round(count / pop * 100000, 2), "\n", fac_type)
+    ),
+    stat = "identity",
+    position = "stack"
+  ) +
+  
+  fill_pal_discrete(factype) +
+  
+  theme_classic() +
+  
+  guides(fill = guide_legend(nrow  = 2)) +
+  
+  theme(
+    legend.position = "top",
+    axis.text.x = element_text(
+      angle = 90,
+      vjust = 0.2,
+      hjust = 1
+    ),
+    axis.title.x = element_blank(),
+    legend.title = element_blank()
+  ) +
+  
+  labs(y = "Facilities per 100,000 residents",
+       caption = "Data Source: NMHSS 2020") +
+  
+  annotate(
+    "segment",
+    x = 1,
+    y = 15,
+    xend = 31,
+    yend = 15,
+  arrow = arrow(type = "closed", length = unit(0.02, "npc"))) +
+  
+  annotate(
+    "text",
+    x = 24,
+    y = 14,
+    label = "More residents",
+    size = 3.3,
+    hjust = 0
+  ) +
+  
+  scale_y_continuous(limits = c(0, 15.2), expand = c(0, 0))
+
+p
+```
+
+**Emergency Treatment Centers**, which include Outpatient Mental Health
+Facilities and Partial/Day Hospitalization Facilities are not evenly
+distributed across states. They seem to be an important contributor to
+Maine's high rate of facilities per capita, while Texas has hardly any
+Emergency Treatment Centers. Traumatic experiences are associated with
+more severe mental health conditions like PTSD, depression, and anxiety.
+These facilities provide the care patients will receive immediately
+after a traumatic experience, in many cases, suicide.
+
+**Community Centers** also contribute to state differences, more so in
+states with smaller populations. Alaska, Wyoming, and Montana have many
+of these facilities per capita. Community Centers and Behavioral Health
+Clinics are a broad category, with some facilities providing 24-hour
+emergency services, day treatment, and treatment for chronic mental
+illness. These facilities are licences by their respective state mental
+health authority. They can also coordinate with physical health care
+providers to give holistic care for all the patient's needs.
+
+## Facility Ownership
+
+Across states, the majority of Mental Health Facilities are owned by
+private non-profits. These facilities are not as incentivized to
+increase profits as for-profit institutions, but seeking care at these
+facilities may be more challenging and less accommodating than public
+facilities.
+
+```{r chunk8}
+
+drilln(ownership) %>%
+  
+  inner_join(pop, by = "state") %>%
+  
+  ggplot() + geom_bar(aes(
+    x = reorder(str_to_title(state), statecount / pop),
+    y = count,
+    fill = ownership
+  ),
+  stat = "identity",
+  position = "fill") +
+  
+  theme_classic() +
+  
+  guides(fill = guide_legend(ncol = 3)) +
+  
+  # coord_cartesian(xlim = c(1, 51), ylim = c(0, 1), clip = "off") +
+  
+  theme(
+    legend.position = "top",
+    axis.text.x = element_text(
+      angle = 90,
+      vjust = 0.2,
+      hjust = 1
+    ),
+    axis.title.x = element_blank(),
+    legend.background = element_blank(),
+    legend.title = element_blank(),
+    legend.box.background = element_blank()
+  ) +
+  
+  scale_y_continuous(breaks = c(0.00, 0.25, 0.5, 0.75, 1.0), 
+                     labels = c("0%", "25%", "50%", "75%", "100%"),
+                     expand = c(0, 0, 0.05, 0)) +
+  
+  fill_pal_discrete(factype) +
+  
+  labs(y = "Proportion of Facilities",
+       caption = "Data Source: NMHSS 2020") +
+  
+  annotate(
+    "segment",
+    x = 1,
+    y = 1.03,
+    xend = 31,
+    yend = 1.03,
+    arrow = arrow(type = "closed", length = unit(0.02, "npc"))
+  ) +
+  
+  annotate(
+    "text",
+    x = 23,
+    y = 1.07,
+    label = "More facilities per capita",
+    size = 3.3,
+    hjust = 0
+  )
+
+```
+
+## Facility Operator
+
+Among public facilities, the organization in charge of facility
+operation impacts who can receive care, who provides the care, and how
+good the care is.
+
+```{r chunk9}
+
+data <- drilln(operator) %>%
+  
+  filter(operator != "logical skip") %>%
+  
+  inner_join(pop, by = "state")
+
+data %>%
+  
+  ggplot() + geom_bar(aes(
+    x = reorder(str_to_title(state), statecount / pop),
+    y = count,
+    fill = operator
+  ),
+  stat = "identity",
+  position = "fill") +
+  
+    scale_y_continuous(breaks = c(0.00, 0.25, 0.5, 0.75, 1.0), 
+                     labels = c("0%", "25%", "50%", "75%", "100%"),
+                     expand = c(0, 0, 0.05, 0)) +
+
+  theme_classic() +
+  
+  guides(fill = guide_legend(nrow  = 3, ncol = 3)) +
+  
+  theme(
+    axis.text.x = element_text(
+      angle = 90,
+      vjust = 0.2,
+      hjust = 1
+    ),
+    axis.title.x = element_blank(),
+    legend.position =  "top",
+    legend.title = element_blank(),
+    legend.background = element_blank(),
+    legend.box.background = element_blank()
+  ) +
+  
+  fill_pal_discrete(factype) +
+  
+  labs(y = "Proportion of Public Facilities",
+       caption = "Data source: NMHSS 2020") +
+  
+  annotate(
+    "segment",
+    x = 1,
+    y = 1.03,
+    xend = 31,
+    yend = 1.03,
+    arrow = arrow(type = "closed", length = unit(0.02, "npc"))
+  ) +
+  
+  annotate(
+    "text",
+    x = 23,
+    y = 1.07,
+    label = "More facilities per capita",
+    size = 3.3,
+    hjust = 0
+  )
+```
+
+The Department of Veterans Affairs operates quite a few publicly-owned
+facilities. While veterans are especially likely to develop mental
+illness and it is important that they receive care too, non-veterans
+don't qualify for Veteran's health benefits and therefore can't receive
+care from facilities operated by the VA. This means that in states like
+South Dakota, Arkansas, New Hampshire, or Florida, **the majority of
+public facilities in the state can't serve the majority of the
+population.**
+
+In fact, South Dakota doesn't have any public facilities that are open
+to the general population.
+
+## Cost
+
+From the 2020 Behavioral Risk Factor Surveillance Survey, about 10% of
+people had to refuse medical care due to cost in the past 12 months,
+which translates to about 33 million people. Nationally, about 50% of facilities offer payment
+assistance to those who cannot afford to pay the full amount or those
+who cannot pay at all. Some facilities accept multiple forms of payment
+for treatment as well, including Medicare, Medicaid, welfare, the state
+mental health authority, or a state-financed insurance plan.
+
+If the individual doesn't have to pay the full amount, or is allowed to
+provide different methods of payment, the less likely an individual is
+to refuse care due to cost.
+
+```{r chunk10}
+
+data <- drilln(PAYASST) %>%
+  dplyr::filter(PAYASST == "yes") %>%
+  dplyr::mutate(per = count / statecount) %>%
+  right_join(us_states, by = c("state" = "full"))
+
+  
+plotly_chloropleth(data = data, z = "per", colors = "Blues", tick_breaks = c(4, 5, 6, 7) * 0.1, symbol = "%") %>%
+    plotly_anno(text = "Data source: NMHSS 2020")
+```
+
+Wyoming, South Dakota, and Oklahoma have the highest percentage of
+facilities that offer payment assistance, but all states have at least
+one facility that offers payment assistance.
+
+<!-- For each facility, we can see how many methods of payment they accept -->
+
+<!-- for mental health services. This analysis doesn't include all possible -->
+
+<!-- methods of payment, but intends to capture how accommodating each -->
+
+<!-- facility is for similar types of payment. -->
+
+```{r chunk11, include=FALSE}
+
+costvars <- c("REVCHK1", "REVCHK2", "REVCHK5", "REVCHK8", "REVCHK10", "FUNDSMHA", "FUNDSTATEWELFARE", "FUNDOTHSTATE", "FUNDLOCALGOV", "FUNDFEDGRANT", "FUNDPRIVCOMM")
+
+data <- nmhss %>%
+  group_by(state) %>%
+  dplyr::reframe(count = rowSums(ifelse(across(all_of(costvars)) == "yes", 1, 0)), 
+                   bins = as.character(cut_width(count, width = 2)),
+                   bins = str_replace(
+                     str_replace(
+                     str_replace_all(
+                       bins, "[\\[\\(\\]\\]]", ""), # much more complex that should be
+                     ",", "-"),
+                     ".*(?=-)", ~as.numeric(.) + 1),
+                   bins = factor(bins, levels = rev(c("0-1", "2-3", "4-5", "6-7", "8-9", "10-11")), ordered = TRUE),
+                   statecount = n()) %>%
+  
+  group_by(state, bins) %>%
+  
+  dplyr::reframe(per = n()/statecount, statecount, state) %>%
+  
+  distinct() %>%
+  
+  inner_join(pop, by = "state") 
+
+data %>%
+    ggplot() + geom_bar(aes(
+    x = reorder(str_to_title(state), statecount / pop),
+    y = per,
+    fill = bins
+  ),
+  stat = "identity",
+  position = "stack") +
+  
+  theme_classic() +
+  
+  guides(fill = guide_legend(ncol = 3)) +
+  
+  scale_y_continuous(breaks = c(0.00, 0.25, 0.5, 0.75, 1.0), 
+                     labels = c("0%", "25%", "50%", "75%", "100%"),
+                     expand = c(0, 0, 0.05, 0)) +
+  
+  theme(
+    legend.position = "top",
+    axis.text.x = element_text(
+      angle = 90,
+      vjust = 0.2,
+      hjust = 1
+    ),
+    axis.title.x = element_blank(),
+    legend.background = element_blank(),
+    legend.title = element_blank(),
+    legend.box.background = element_blank()
+  ) +
+  
+  fill_pal_discrete(rev(factype)) +
+  
+  labs(y = "Proportion of Facilities",
+       caption = "Data source: NMHSS 2020") +
+  
+  annotate(
+    "segment",
+    x = 1,
+    y = 1.03,
+    xend = 31,
+    yend = 1.03,
+    arrow = arrow(type = "closed", length = unit(0.02, "npc"))
+  ) +
+  
+  annotate(
+    "text",
+    x = 23,
+    y = 1.07,
+    label = "More facilities per capita",
+    size = 3.3,
+    hjust = 0
+  )
+```
+
+<!-- Each state seems to have facilities that accept just a few payment types, and -->
+
+<!-- those that accept many. Montana and Wyoming have a slightly higher -->
+
+<!-- number of facilities that accept more payment types, but only slightly. -->
+
+<!-- ## Treatment -->
+
+<!-- ```{r} -->
+
+<!-- ``` -->
+
+<!-- ## Demographics -->
+
+<!-- # Stages -->
+
+<!-- # Scoring -->
+
+<!-- # Results -->
+
+<!-- # Disucussion & Future Directions -->
+
+<!-- Exact facility location, more specific -->
+
+
+# Supplemental Material
+
+### Marijuana Use
+
+Only some BRFSS respondents were asked about their marijuana use, and many reported that they didn't smoke. This resulted in missing data for some states, and so this was not included.
+
+```{r}
+data <- drillb(MARIJAN1) %>%
+  dplyr::filter(MARIJAN1 <= 30) %>%
+  group_by(state) %>%
+  dplyr::mutate(per = sum(count) / statecount) %>%
+  right_join(us_states, by = c("state" = "full"))
+
+
+
+plotly_chloropleth(data = data, z = "per", colors = "Greens", tick_breaks = c(0.075, 0.10, 0.125, 0.150), symbol = "%") %>%
+    plotly_anno(text = "Data source: BRFSS 2020")
+```
+
+### Living With
+
+Participants were also asked:
+
+> "Did you live with anyone who was depressed, mentally ill, or suicidal?"
+
+Although these questions don't implicate the respondent directly, may be
+affected by the rate of cohabitation, and less than half of all states reported data, I think the results are
+still interesting, and may more accurately represent the level of mental
+illness in the region due to response bias.
+
+```{r chunk3}
+data <- drillb(ACEDEPRS) %>%
+  
+  group_by(state) %>%
+  
+  reframe(per = `count`/sum(`count`), ACEDEPRS, n = sum(`count`)) %>%
+  
+  dplyr::filter(ACEDEPRS == "1") %>%
+  
+  right_join(us_states, by = c("state" = "full"))
+
+
+
+plotly_chloropleth(data = data, z = "per", colors = "Purples", tick_breaks = c(12, 16, 20) * 0.01, symbol = "%") %>%
+    plotly_anno(text = "Data source: BRFSS 2020")
+```
+
+Participants were also asked:
+
+>     "Did you live with anyone who used illegal street drugs or who abused prescription medications?"
+
+```{r chunk4}
+
+data <- drillb(ACEDRUGS) %>%
+  
+  group_by(state) %>%
+  
+  reframe(per = `count` / sum(`count`), ACEDRUGS, n = sum(`count`)) %>%
+  
+  dplyr::filter(ACEDRUGS == "1") %>%
+  
+  right_join(us_states, by = c("state" = "full"))
+
+
+plotly_chloropleth(data = data, z = "per", colors = "Greys", tick_breaks = c(0.1, 0.14, 0.18, 0.22), symbol = "%") %>%
+    plotly_anno(text = "Data source: BRFSS 2020")
+```
+
+Based on the primary indicator of mental health gathered from the
+behavioral survey, the most chronic mental health difficulties seem to
+be mostly observed in tight geographic regions of the Midwest and in the
+South, in states like Kentucky, West Virginia, Arkansas, and
+Louisiana. Nevada also scored highly on this measure.
+
+Signs of substance abuse seemed to be observed most often in the
+northern states, Wisconsin, Iowa, including Montana, Nebraska, and North
+Dakota.
+
+While the results of the indirect questions highlighted Montana, Utah,
+and Kentucky as states of interest for substance abuse and mental
+health, the data is too incomplete to use further.
+
+# References
+
+## Data
+
+The data used in this project comes from:
+
+-   The Behavioral Risk Factor Surveillance System 2020 (BRFSS)
+-   The National Mental Health Services Survey 2020 (NMHSS)
+
+In addition, I used data on population from the U.S. Census Bureau 2020
+for per-capita information.
+
+## Works Consulted
+
+Substance Abuse and Mental Health Services Administration, National
+Mental Health Services Survey (N-MHSS): 2020. Data on Mental Health
+Treatment Facilities. Rockville, MD: Substance Abuse and Mental Health
+Services Administration, 2021.
+
+-   [BRFSS User
+    Guide](https://www.cdc.gov/brfss/data_documentation/pdf/UserguideJune2013.pdf)
+-   [BRFSS
+    Codebook](https://www.cdc.gov/brfss/annual_data/2020/pdf/codebook20_llcp-v2-508.pdf)
+-   [N-MHSS
+    Codebook](https://www.datafiles.samhsa.gov/sites/default/files/field-uploads-protected/studies/N-MHSS-2020/N-MHSS-2020-datasets/N-MHSS-2020-DS0001/N-MHSS-2020-DS0001-info/N-MHSS-2020-DS0001-info-codebook.pdf)
+
+[https://www.va.gov/health-care/eligibility/](VA Health Programs)
+
+
+## Packages
+
+R Core Team (2022). R: A language and environment for statistical computing. R Foundation for Statistical Computing, Vienna, Austria. URL https://www.R-project.org/.
+  
+Wickham H, Averick M, Bryan J, Chang W, McGowan LD, François R, Grolemund G, Hayes A, Henry L, Hester J, Kuhn M, Pedersen TL,
+Miller E, Bache SM, Müller K, Ooms J, Robinson D, Seidel DP, Spinu V, Takahashi K, Vaughan D, Wilke C, Woo K, Yutani H
+(2019). “Welcome to the tidyverse.” _Journal of Open Source Software_, *4*(43), 1686. doi: 10.21105/joss.01686 (URL:
+https://doi.org/10.21105/joss.01686).

@@ -1,69 +1,11 @@
-# cleaning and eda for cdc
 
-require(readr)
-require(dplyr)
-require(stringr)
-require(here)
-library(rio)
-library(haven)
-library(here)
-
-source("process-functions.R")
-
-here()
-
-# setwd("~/LocalRStudio/mhealth352")
-
-`%!in%` <- Negate(`%in%`)
-
-#=========================== population and states =============================
-
-statekey <- tibble(state = str_to_title(state.name), abb = state.abb, num = c(1:8, 10:51)) %>%
+pop <- read_csv("data/census2020pop.csv") %>%
   
-  rows_insert(tibble(state = "District of Columbia", abb = "DC", num = 9), by = "state") %>%
+  right_join(statekey, by = c("NAME" = "state")) %>%
   
-  arrange(state)
-
-pop <- read_csv("./data/census2020pop.csv") %>%
-    
-    dplyr::mutate(state = str_to_title(NAME)) %>%
-    
-    right_join(statekey, by = "state") %>%
-    
-    summarise(state, abb, num, pop = ESTIMATESBASE2020, pct = pop / sum(ESTIMATESBASE2020))
+  summarise(state = NAME, abb, fips, pop = ESTIMATESBASE2020, pct = pop / sum(ESTIMATESBASE2020))
 
 #===========================  read in CDC  data ================================
-
-# FNS
-
-load_cdc <- function(fn, vars = goodvars, path = "./data/brfss.csv") {
-  
-    if (file.exists(path)) {
-        
-        data <- read_csv(path)
-        
-        return(data)
-        
-    } else {
-        
-      temp <- tempfile()
-      
-      download.file("https://www.cdc.gov/brfss/annual_data/2020/files/LLCP2020XPT.zip", temp)
-      
-      data <- read_xpt(temp)
-      
-      file.remove(temp)
-      
-      data <- fn(data, vars)
-      
-      write_csv(data, path)
-      
-      return(data)
-      
-      rm(temp, data)
-    }
-}
-
 # data dictionary
 # https://www.cdc.gov/brfss/annual_data/2020/pdf/codebook20_llcp-v2-508.pdf
 # large df downloadable from https://www.cdc.gov/brfss/annual_data/2020/files/LLCP2020XPT.zip
@@ -76,17 +18,16 @@ load_cdc <- function(fn, vars = goodvars, path = "./data/brfss.csv") {
 #  important vars
 
 idvars <- c("X_STATE", "IDATE", "QSTLANG", "X_METSTAT",
-           "X_URBSTAT", "X_IMPRACE", "X_RFHLTH",
-           "X_PHYS14D", "X_MENT14D", "X_SEX", "X_AGE_G",
-           "HTM4", "WTKG3", "X_BMI5", "X_EDUCAG", "X_INCOMG", "X_LLCPWT")
+            "X_URBSTAT", "X_IMPRACE", "X_RFHLTH",
+            "X_PHYS14D", "X_MENT14D", "X_SEX", "X_AGE_G",
+            "HTM4", "WTKG3", "X_BMI5", "X_EDUCAG", "X_INCOMG", "X_LLCPWT")
 
-cdchealthvars <- c("GENHLTH", "PHYSHLTH", "MENTHLTH", "POORHLTH", "EMPLOY1", "EXERANY2", "X_RFBING5", "ACEDRUGS", "ACEDEPRS")
+cdchealthvars <- c("GENHLTH", "PHYSHLTH", "MENTHLTH", "POORHLTH", "EMPLOY1", "EXERANY2", "X_RFBING5", "ACEDRUGS", "ACEDEPRS", "AVEDRNK3", "SMOKDAY2", "MARIJAN1")
 
 othervars <- c("HLTHPLN1", 'PERSDOC2', "MEDCOST", "CHECKUP1", "MARITAL", "CHILDREN", "MENTHLTH",
                "PHYSHLTH", "GENHLTH", "MSCODE")
 
 # not included
-
 calc <- c("IDATE", "QSTLANG", "X_SEX", "X_EDUCAG", "X_URBSTAT", "X_METSTAT", "X_IMPRACE",
           "X_RFHLTH", "X_PHYS14D", "X_MENT14D", "EXERANY2", "GENHLTH", "X_AGE_G", "X_INCOMG", "EMPLOY1", 
           "CHILDREN", "MARITAL", "CHECKUP1", "MEDCOST", "PERSDOC2", "HLTHPLN1", "MSCODE")
@@ -96,23 +37,26 @@ goodvars <- c(idvars, cdchealthvars, othervars)
 brfss <- load_cdc(clean_cdc, # cleaning function
                   goodvars) # cols to keep
 
-#============================== nmhss ==========================================
 
+
+
+
+# select vars and refactor vars from nmhss data
 # dictionary: https://www.datafiles.samhsa.gov/sites/default/files/field-uploads-protected/studies/N-MHSS-2020/N-MHSS-2020-datasets/N-MHSS-2020-DS0001/N-MHSS-2020-DS0001-info/N-MHSS-2020-DS0001-info-codebook.pdf
 
-nmhss <- read_csv("./data/nmhss-puf-2020-csv.csv")
+nmhss <- read_csv("data/nmhss-puf-2020-csv.csv")
 
 # Group some vars
 
 # Important vars
 
 ndem <- c("LST", "MHINTAKE", "MHDIAGEVAL", "TREATMT", "FACILITYTYPE", "FOCUS", "OWNERSHP", 
-         "PUBLICAGENCY", "RELIG", "NOTREAT", "ANTIPSYCH", "MHCASEMGMT", "MHCHRONIC", "PRIMARYCARE",
-         "DIETEXERCOUNSEL", "MHEDUCATION", "MHNOSVCS", "SRVC31", "NOSPECGRP", "LANG", "ADOPTSECLUSION",
-         # cost
-         "PAYASST", "REVCHK1", "REVCHK2", "REVCHK5", "REVCHK8", "REVCHK10", "FUNDSMHA", "FUNDSTATEWELFARE", "FUNDOTHSTATE", "FUNDLOCALGOV", "FUNDFEDGRANT", "FUNDPRIVCOMM",
-         
-         "LICENMH", "OTHFAC", "FACNUM", "IPSERV", "IPTOTAL")
+          "PUBLICAGENCY", "RELIG", "NOTREAT", "ANTIPSYCH", "MHCASEMGMT", "MHCHRONIC", "PRIMARYCARE",
+          "DIETEXERCOUNSEL", "MHEDUCATION", "MHNOSVCS", "SRVC31", "NOSPECGRP", "LANG", "ADOPTSECLUSION",
+          # cost
+          "PAYASST", "REVCHK1", "REVCHK2", "REVCHK5", "REVCHK8", "REVCHK10", "FUNDSMHA", "FUNDSTATEWELFARE", "FUNDOTHSTATE", "FUNDLOCALGOV", "FUNDFEDGRANT", "FUNDPRIVCOMM",
+          
+          "LICENMH", "OTHFAC", "FACNUM", "IPSERV", "IPTOTAL")
 
 # Taken in only April 2020
 
@@ -171,8 +115,8 @@ management <- c("MHINTCASEMGMT", "MHCASEMGMT", "MHCOURTORDERED", "MHAOT", "MHCHR
 # Language support vars
 
 lang <- c("LANG", "LANGPROV", "LANG16", "LANG_B", "LANG1", "LANG2", "LANG3", "LANG21", "LANG4", "LANG5",
-           "LANG6", "LANG7", "LANG8", "LANG24", "LANG9", "LANG10", "LANG22", "LANG25", "LANG26", "LANG11",  
-           "LANG19", "LANG23", "LANG12", "LANG13", "LANG14", "LANG15", "LANG20", "LANG17", "LANG18")
+          "LANG6", "LANG7", "LANG8", "LANG24", "LANG9", "LANG10", "LANG22", "LANG25", "LANG26", "LANG11",  
+          "LANG19", "LANG23", "LANG12", "LANG13", "LANG14", "LANG15", "LANG20", "LANG17", "LANG18")
 
 # Calculated vars
 
@@ -181,47 +125,42 @@ calc <- c("LANGPROV", "TOTADMIS", "OPLEGALTOTFOREN", "OPLEGALTOTNONFOREN", "OPLE
           "OPETHTOTUNK", "OPETHTOTNONHISP", "OPETHTOTHISP", "OPAGETOT65", "OPAGETOT1864", "OPAGETOT017")
 
 nmhss <- nmhss %>%
-    
-    dplyr::transmute(across(all_of(c(apr2020, ndem)), basiclayer),
-                     id = CASEID,
-                     facilitytype = factor(FACILITYTYPE, labels = c("1" = "Psychiatric hospital",
-                                                                   "2" = "Separate inpatient psychiatric unit of a general hospital",
-                                                                   "3" = "Residential treatment center for children",
-                                                                   "4" = "Residential treatment center for adults",
-                                                                   "5" = "Other residential treatment facility",
-                                                                   "6" = "Veterans Administration Medical Center (VAMC)",
-                                                                   "7" = "Community Mental Health Center (CMHC)",
-                                                                   "8" = "Certified Community Behavioral Health Clinic (CCBHC)",
-                                                                   "9" = "Partial hospitalization/day treatment facility",
-                                                                   "10" = "Outpatient MHF",
-                                                                   "11" = "Multi-setting MHF",
-                                                                   "12" = "Other")),
-                    focus = factor(FOCUS, labels = c("1" = "Mental health treatment",
-                                                     "3" = "Mental health/substance abuse treatment",
-                                                     "4" = "General health care",
-                                                     "5" = "Other")),
-                    ownership = factor(OWNERSHP, labels = c("1" = "Private for-profit organization",
-                                                            "2" = "Private non-profit organization",
-                                                            "3" = "Public agency or department")),
-                    operator = factor(PUBLICAGENCY, labels = c("-2" = "logical skip",
-                                                               "1" = "State mental health authority (SMHA)",
-                                                               "2" = "Other state government agency or department",
-                                                               "3" = "Regional authority orgovernment",
-                                                               "4" = "Tribal government",
-                                                               "5" = "Indian Health Service",
-                                                               "6" = "Department of Veterans Affairs",
-                                                               "7" = "Other")),
-                    facnum = factor(FACNUM, labels = c("-2" = "1",
-                                                       "1" = "2-5",
-                                                       "2" = "6-10",
-                                                       "3" = "11-30",
-                                                       "4" = "30+"))) %>%
-      
-    right_join(statekey, by = c("LST" = "abb")) %>%
-    
-    dplyr::select(-LST, -num)
-
-
-# fix states, remove PR and other
-
-rm(basiclayer, clean_cdc, get_cdc)
+  
+  dplyr::transmute(across(all_of(c(apr2020, ndem)), basiclayer),
+                   id = CASEID,
+                   facilitytype = factor(FACILITYTYPE, labels = c("1" = "Psychiatric hospital",
+                                                                  "2" = "Separate inpatient psychiatric unit of a general hospital",
+                                                                  "3" = "Residential treatment center for children",
+                                                                  "4" = "Residential treatment center for adults",
+                                                                  "5" = "Other residential treatment facility",
+                                                                  "6" = "Veterans Administration Medical Center (VAMC)",
+                                                                  "7" = "Community Mental Health Center (CMHC)",
+                                                                  "8" = "Certified Community Behavioral Health Clinic (CCBHC)",
+                                                                  "9" = "Partial hospitalization/day treatment facility",
+                                                                  "10" = "Outpatient MHF",
+                                                                  "11" = "Multi-setting MHF",
+                                                                  "12" = "Other")),
+                   focus = factor(FOCUS, labels = c("1" = "Mental health treatment",
+                                                    "3" = "Mental health/substance abuse treatment",
+                                                    "4" = "General health care",
+                                                    "5" = "Other")),
+                   ownership = factor(OWNERSHP, labels = c("1" = "Private for-profit organization",
+                                                           "2" = "Private non-profit organization",
+                                                           "3" = "Public agency or department")),
+                   operator = factor(PUBLICAGENCY, labels = c("-2" = "logical skip",
+                                                              "1" = "State mental health authority (SMHA)",
+                                                              "2" = "Other state government agency or department",
+                                                              "3" = "Regional authority orgovernment",
+                                                              "4" = "Tribal government",
+                                                              "5" = "Indian Health Service",
+                                                              "6" = "Department of Veterans Affairs",
+                                                              "7" = "Other")),
+                   facnum = factor(FACNUM, labels = c("-2" = "1",
+                                                      "1" = "2-5",
+                                                      "2" = "6-10",
+                                                      "3" = "11-30",
+                                                      "4" = "30+"))) %>%
+  
+  right_join(statekey, by = c("LST" = "abb")) %>%
+  
+  dplyr::select(-LST, -fips)
